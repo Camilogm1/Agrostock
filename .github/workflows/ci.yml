@@ -1,0 +1,22 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restaurar dependencias
+        run: dotnet restore AgroStockTaller.sln
+
+      - name: Compilar
+        run: dotnet build AgroStockTaller.sln --no-restore --configuration Release
+
+      - name: Ejecutar pruebas
+        run: dotnet test tests/AgroStockTaller.Tests/AgroStockTaller.Tests.csproj --no-build --configuration Release --verbosity normal
