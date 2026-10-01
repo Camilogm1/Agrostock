@@ -30,6 +30,11 @@ Debe mostrar: `Passed! - Failed: 0, Passed: 3, Skipped: 0, Total: 3`.
 ## Estado del pipeline
 ![CI](https://github.com/Camilogm1/Agrostock/actions/workflows/ci.yml/badge.svg)
 
+### Estado del Proyecto
+![Last Commit](https://img.shields.io/github/last-commit/Camilogm1/Agrostock/main?style=flat-square&logo=git)
+![Commits](https://img.shields.io/github/commit-activity/m/Camilogm1/Agrostock?style=flat-square&logo=git)
+![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
+
 ## Historia implementada en este taller
 **RF-01 — Registro de cultivos**
 
