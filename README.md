@@ -19,6 +19,8 @@ dotnet run
 Abre `http://localhost:5000/swagger` (o el puerto que indique la consola) para probar
 `POST /api/cultivos` y `GET /api/cultivos` manualmente.
 
+> Nota importante para Windows: si el repositorio está dentro de OneDrive, el ensamblado de pruebas puede quedar bloqueado por la protección de "Control de aplicaciones". Para evitarlo, clona o copia el proyecto en una carpeta normal como `C:\Users\<tu_usuario>\source\repos\Agrostock`.
+
 ## Cómo correr las pruebas
 ```bash
 cd tests/AgroStockTaller.Tests
@@ -28,7 +30,6 @@ dotnet test
 Debe mostrar: `Passed! - Failed: 0, Passed: 3, Skipped: 0, Total: 3`.
 
 ## Estado del pipeline
-<!-- TODO: reemplazar OWNER/REPO por el repo real del equipo en GitHub -->
 ![CI](https://github.com/Camilogm1/Agrostock/actions/workflows/ci.yml/badge.svg)
 
 
