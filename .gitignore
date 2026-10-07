@@ -1,2 +1,15 @@
+# .NET
 bin/
 obj/
+
+# Node / React
+node_modules/
+dist/
+
+# Entorno
+.env
+*.user
+
+# Editor
+.vs/
+.vscode/
