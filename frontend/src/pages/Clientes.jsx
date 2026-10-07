@@ -11,6 +11,7 @@ export default function Clientes() {
     try {
       const { data } = await axiosClient.get("/clientes", { params: { texto } });
       setClientes(data);
+      setError("");
     } catch (err) {
       setError(err.message);
     }

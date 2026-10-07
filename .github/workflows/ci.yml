@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  test:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,10 +13,30 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restaurar dependencias
-        run: dotnet restore backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj
+        run: dotnet restore backend/AgroStock.sln
 
       - name: Compilar
-        run: dotnet build backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj --no-restore --configuration Release
+        run: dotnet build backend/AgroStock.sln --no-restore --configuration Release
 
       - name: Ejecutar pruebas
-        run: dotnet test backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj --no-build --configuration Release --verbosity normal
+        run: dotnet test backend/AgroStock.sln --no-build --configuration Release --verbosity normal
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build

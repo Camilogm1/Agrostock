@@ -47,7 +47,11 @@ namespace AgroStock.Api.Data
             modelBuilder.Entity<Inventario>(e =>
             {
                 e.HasKey(i => i.IdInventario);
-                e.Property(i => i.CantidadDisponible).HasColumnType("decimal(18,2)");
+                e.Property(i => i.CantidadDisponible)
+                 .HasColumnType("decimal(18,2)")
+                 .IsConcurrencyToken(); // evita vender dos veces el mismo stock en ventas simultáneas
+                e.Property(i => i.FechaActualizacion)
+                 .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc)); // se guarda en UTC
                 e.HasIndex(i => i.IdCultivo).IsUnique(); // relación 1-1 Cultivo-Inventario
                 e.HasOne(i => i.Cultivo)
                  .WithMany()

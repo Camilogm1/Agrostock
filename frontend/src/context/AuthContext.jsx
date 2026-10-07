@@ -1,13 +1,14 @@
 import { createContext, useContext, useState } from "react";
-import axiosClient from "../api/axiosClient";
+import axiosClient, { CLAVES_SESION } from "../api/axiosClient";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(() => {
+    const token = localStorage.getItem("agrostock_token");
     const nombre = localStorage.getItem("agrostock_usuario");
     const rol = localStorage.getItem("agrostock_rol");
-    return nombre ? { nombreUsuario: nombre, rol } : null;
+    return token && nombre ? { nombreUsuario: nombre, rol } : null;
   });
 
   async function login(nombreUsuario, contrasena) {
@@ -19,14 +20,14 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    localStorage.removeItem("agrostock_token");
-    localStorage.removeItem("agrostock_usuario");
-    localStorage.removeItem("agrostock_rol");
+    CLAVES_SESION.forEach((clave) => localStorage.removeItem(clave));
     setUsuario(null);
   }
 
+  const esAdmin = usuario?.rol === "Administrador";
+
   return (
-    <AuthContext.Provider value={{ usuario, login, logout }}>
+    <AuthContext.Provider value={{ usuario, esAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

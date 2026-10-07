@@ -6,8 +6,8 @@ using AgroStock.Api.Models;
 
 namespace AgroStock.Api.Services
 {
-    // Implementa el diagrama de secuencia: transacción, validación de stock
-    // (RF-16/RF-18), descuento de inventario (RF-17) y rollback ante fallo.
+    // Diagrama de secuencia de la venta: validar stock (RF-16/RF-18), registrar la venta
+    // y descontar el inventario (RF-17) de forma atómica.
     public class VentaService : IVentaService
     {
         private readonly AgroStockDbContext _db;
@@ -17,50 +17,30 @@ namespace AgroStock.Api.Services
         {
             if (request.Cantidad <= 0)
                 throw new ArgumentException("La cantidad vendida debe ser mayor a cero.");
+            if (request.Fecha == default)
+                throw new ArgumentException("La fecha de la venta es obligatoria.");
 
-            await using var transaction = await _db.Database.BeginTransactionAsync();
-            try
-            {
-                var cliente = await _db.Clientes.FindAsync(request.IdCliente)
-                    ?? throw new NotFoundException($"Cliente {request.IdCliente} no encontrado.");
+            var cliente = await _db.Clientes.FindAsync(request.IdCliente)
+                ?? throw new NotFoundException($"Cliente {request.IdCliente} no encontrado.");
 
-                var inventario = await _db.Inventarios
-                    .Include(i => i.Cultivo)
-                    .FirstOrDefaultAsync(i => i.IdInventario == request.IdInventario)
-                    ?? throw new NotFoundException($"Inventario {request.IdInventario} no encontrado.");
+            var inventario = await _db.Inventarios
+                .Include(i => i.Cultivo)
+                .FirstOrDefaultAsync(i => i.IdInventario == request.IdInventario)
+                ?? throw new NotFoundException($"Inventario {request.IdInventario} no encontrado.");
 
-                if (!inventario.HayStockSuficiente(request.Cantidad)) // RF-16/RF-18
-                {
-                    await transaction.RollbackAsync();
-                    throw new StockInsuficienteException(inventario.IdInventario, request.Cantidad, inventario.CantidadDisponible);
-                }
+            inventario.DescontarStock(request.Cantidad); // lanza StockInsuficienteException si no alcanza
 
-                var venta = new Venta { IdCliente = cliente.IdCliente, Fecha = request.Fecha };
-                _db.Ventas.Add(venta);
-                await _db.SaveChangesAsync();
+            var venta = new Venta { IdCliente = cliente.IdCliente, Fecha = request.Fecha };
+            venta.Detalles.Add(new DetalleVenta { Inventario = inventario, Cantidad = request.Cantidad });
+            _db.Ventas.Add(venta);
 
-                var detalle = new DetalleVenta
-                {
-                    IdVenta = venta.IdVenta,
-                    IdInventario = inventario.IdInventario,
-                    Cantidad = request.Cantidad
-                };
-                _db.DetallesVenta.Add(detalle);
+            // Un solo SaveChanges = una transacción (venta + detalle + stock). Si otra venta cambió
+            // el stock mientras tanto, el token de concurrencia hace fallar el guardado (409).
+            await _db.SaveChangesAsync();
 
-                inventario.DescontarStock(request.Cantidad); // RF-17
-                await _db.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return new VentaResponse(
-                    venta.IdVenta, venta.Fecha, cliente.IdCliente, cliente.Nombre,
-                    new List<DetalleVentaResponse> { new(inventario.IdInventario, ObtenerNombreProducto(inventario), request.Cantidad) });
-            }
-            catch
-            {
-                if (transaction.GetDbTransaction().Connection != null)
-                    await transaction.RollbackAsync();
-                throw;
-            }
+            return new VentaResponse(
+                venta.IdVenta, venta.Fecha, cliente.IdCliente, cliente.Nombre,
+                new List<DetalleVentaResponse> { new(inventario.IdInventario, ObtenerNombreProducto(inventario), request.Cantidad) });
         }
 
         public async Task<List<VentaResponse>> ListarAsync(string? filtroCliente, DateTime? filtroFecha)
@@ -73,9 +53,13 @@ namespace AgroStock.Api.Services
             if (!string.IsNullOrWhiteSpace(filtroCliente))
                 query = query.Where(v => v.Cliente!.Nombre.Contains(filtroCliente));
             if (filtroFecha.HasValue)
-                query = query.Where(v => v.Fecha.Date == filtroFecha.Value.Date);
+            {
+                var desde = filtroFecha.Value.Date;
+                var hasta = desde.AddDays(1);
+                query = query.Where(v => v.Fecha >= desde && v.Fecha < hasta);
+            }
 
-            var ventas = await query.ToListAsync();
+            var ventas = await query.OrderByDescending(v => v.Fecha).ThenByDescending(v => v.IdVenta).ToListAsync();
 
             return ventas.Select(v => new VentaResponse(
                 v.IdVenta, v.Fecha, v.IdCliente, v.Cliente!.Nombre,

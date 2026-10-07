@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
-  const { usuario, logout } = useAuth();
+  const { usuario, esAdmin, logout } = useAuth();
   const navigate = useNavigate();
   if (!usuario) return null;
 
@@ -14,7 +14,7 @@ export default function Navbar() {
   return (
     <nav style={{ display: "flex", gap: "1rem", padding: "1rem", borderBottom: "1px solid #ccc" }}>
       <Link to="/cultivos">Cultivos</Link>
-      <Link to="/cosechas">Cosechas</Link>
+      {esAdmin && <Link to="/cosechas">Cosechas</Link>}
       <Link to="/inventario">Inventario</Link>
       <Link to="/clientes">Clientes</Link>
       <Link to="/ventas">Ventas</Link>

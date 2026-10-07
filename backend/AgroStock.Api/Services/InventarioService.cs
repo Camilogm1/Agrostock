@@ -11,14 +11,17 @@ namespace AgroStock.Api.Services
 
         public async Task<List<InventarioResponse>> ListarAsync(string? filtro)
         {
-            var query = _db.Inventarios.Include(i => i.Cultivo).AsQueryable();
+            var query = _db.Inventarios.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(filtro))
                 query = query.Where(i => i.Cultivo!.Nombre.Contains(filtro) || i.Cultivo!.Tipo.Contains(filtro));
 
-            return await query.Select(i => new InventarioResponse(
-                i.IdInventario, i.IdCultivo, i.Cultivo!.Nombre,
-                i.CantidadDisponible, i.FechaActualizacion)).ToListAsync();
+            return await query
+                .OrderBy(i => i.Cultivo!.Nombre)
+                .Select(i => new InventarioResponse(
+                    i.IdInventario, i.IdCultivo, i.Cultivo!.Nombre,
+                    i.CantidadDisponible, i.FechaActualizacion))
+                .ToListAsync();
         }
     }
 }

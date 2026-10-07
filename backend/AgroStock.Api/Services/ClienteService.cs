@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using AgroStock.Api.Data;
 using AgroStock.Api.DTOs;
+using AgroStock.Api.Exceptions;
 using AgroStock.Api.Models;
 
 namespace AgroStock.Api.Services
@@ -17,11 +18,12 @@ namespace AgroStock.Api.Services
             if (string.IsNullOrWhiteSpace(request.NumeroIdentificacion))
                 throw new ArgumentException("El número de identificación es obligatorio.");
 
-            var existe = await _db.Clientes.AnyAsync(c => c.NumeroIdentificacion == request.NumeroIdentificacion);
+            var identificacion = request.NumeroIdentificacion.Trim();
+            var existe = await _db.Clientes.AnyAsync(c => c.NumeroIdentificacion == identificacion);
             if (existe)
-                throw new InvalidOperationException("Ya existe un cliente con esa identificación."); // RNF-09
+                throw new ConflictoException("Ya existe un cliente con esa identificación."); // RNF-09
 
-            var cliente = new Cliente { Nombre = request.Nombre, NumeroIdentificacion = request.NumeroIdentificacion };
+            var cliente = new Cliente { Nombre = request.Nombre.Trim(), NumeroIdentificacion = identificacion };
             _db.Clientes.Add(cliente);
             await _db.SaveChangesAsync();
 
@@ -35,6 +37,7 @@ namespace AgroStock.Api.Services
                 query = query.Where(c => c.Nombre.Contains(texto) || c.NumeroIdentificacion.Contains(texto));
 
             return await query
+                .OrderBy(c => c.Nombre)
                 .Select(c => new ClienteResponse(c.IdCliente, c.Nombre, c.NumeroIdentificacion))
                 .ToListAsync();
         }
