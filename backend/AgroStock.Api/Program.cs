@@ -83,5 +83,6 @@ app.UseCors("FrontendReact");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/api/health", () => Results.Ok(new { estado = "ok" })); // HU-06
 
 app.Run();

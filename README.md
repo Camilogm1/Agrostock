@@ -132,10 +132,11 @@ Se crean solo en desarrollo, desde `appsettings.Development.json`:
 
 ## API
 
-Todas las rutas, excepto el login, requieren el encabezado `Authorization: Bearer <token>`.
+Todas las rutas, excepto el login y el health check, requieren el encabezado `Authorization: Bearer <token>`.
 
 | Método | Ruta | Descripción | Rol |
 |---|---|---|---|
+| GET | `/api/health` | Verifica que la API está encendida | Público |
 | POST | `/api/auth/login` | Inicia sesión y devuelve el token | Público |
 | GET | `/api/cultivos` | Lista los cultivos | Todos |
 | POST | `/api/cultivos` | Registra un cultivo (y su inventario en 0) | Administrador |
@@ -193,23 +194,30 @@ El pipeline `.github/workflows/ci.yml` corre en cada push y pull request: compil
 
 ## Estado del proyecto
 
-**Avance estimado: ~75%.** Sprints 1 a 3 implementados; Sprint 4 (calidad y cierre) en curso.
+**Avance estimado: ~75%.** Los Sprints 1 a 3 están implementados; el Sprint 4 (calidad y cierre) está en curso. El detalle sigue el plan de la Entrega 1 (4 sprints de 3 semanas).
 
-### Hecho
-
-- **Sprint 1 · Base técnica:** modelo de dominio, `DbContext` con todas las relaciones, migraciones, JWT con roles, CORS, Swagger, frontend con rutas protegidas.
-- **Sprint 2 · Producción e inventario:** cultivos (CRUD completo), cosechas con actualización automática de inventario, historial de cosechas, consulta de inventario con filtro.
-- **Sprint 3 · Comercial:** clientes con identificación única, ventas con validación y descuento de stock, historial con filtros por cliente y fecha.
-- **Calidad:** 20 pruebas unitarias sobre los 4 servicios principales, CI para backend y frontend, flujo completo verificado contra MariaDB real.
-
-### Pendiente
-
-- **Ventas:** filtro por rango de fechas (hoy filtra por un día exacto) y selector de producto agrupado por cultivo.
-- **Usuarios:** no hay pantalla ni endpoint para crear usuarios; hoy solo existen los de prueba.
-- **HU-22 · Cobertura:** pruebas de integración de los controladores (autorización por rol, códigos HTTP).
-- **HU-23 · Usabilidad:** diseño visual, indicadores de carga y diseño responsivo (hoy la interfaz es funcional pero básica).
-- **HU-24 · Documentación:** manual de usuario por rol y diccionario de datos.
-- **HU-25 · Demo:** guion y datos de prueba para la sustentación.
+| Sprint | HU | Estado |
+|---|---|---|
+| 1 · Base técnica | HU-01 Login por rol | ✅ |
+| | HU-02 Navegación por módulos | ✅ Menú, rutas protegidas, redirección de rutas inexistentes |
+| | HU-03 Backlog priorizado | ✅ Entrega 1 |
+| | HU-04 Diseño de interfaz consistente | ⚠️ Interfaz funcional sin guía visual (se cierra con HU-23) |
+| | HU-05 Base de datos | ✅ Migraciones EF, llaves, índices únicos, usuarios de prueba |
+| | HU-06 Proyecto configurado | ✅ Docker, configuración, ORM, `/api/health` |
+| 2 · Producción e inventario | HU-07 a HU-10 CRUD de cultivos | ✅ (falta paginación en el listado) |
+| | HU-11 Registrar cosecha | ✅ |
+| | HU-12 Inventario automático por cosecha | ✅ Transaccional, con pruebas |
+| | HU-13 Consultar inventario | ✅ Filtro por cultivo o tipo |
+| 3 · Comercial | HU-14, HU-15 Clientes | ✅ Identificación única, búsqueda por nombre o ID |
+| | HU-16, HU-17 Registrar venta con stock visible | ✅ |
+| | HU-18 Impedir venta sin stock | ✅ Incluye concurrencia básica |
+| | HU-19 Descuento automático | ✅ Transaccional, con pruebas |
+| | HU-20 Historial con filtros | ✅ Por cliente y por fecha |
+| 4 · Calidad y cierre | HU-21 Flujo completo sin errores | ⚠️ Verificado manualmente contra MariaDB; falta el dataset de demo |
+| | HU-22 Pruebas funcionales y regresión | ⚠️ 20 pruebas unitarias; falta plan de pruebas por HU y evidencias |
+| | HU-23 Usabilidad | ❌ Estados de carga/vacío, estilos, accesibilidad |
+| | HU-24 Documentación | ⚠️ README listo; falta manual de usuario por rol y diccionario de datos |
+| | HU-25 Demo | ❌ Guion, dataset estable y plan de contingencia |
 
 ## Uso de IA
 
