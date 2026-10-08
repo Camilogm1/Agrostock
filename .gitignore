@@ -1,2 +1,19 @@
+# .NET
 bin/
 obj/
+*.user
+.vs/
+TestResults/
+
+# Node / React
+node_modules/
+dist/
+
+# Entorno
+.env
+.env.local
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
