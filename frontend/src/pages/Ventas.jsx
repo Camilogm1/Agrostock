@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../api/axiosClient";
+import { formatearFecha, hoy } from "../utils/fechas";
+
+const FORM_VACIO = { idCliente: "", idInventario: "", cantidad: "" };
 
 export default function Ventas() {
   const [clientes, setClientes] = useState([]);
   const [inventario, setInventario] = useState([]);
-  const [form, setForm] = useState({ idCliente: "", idInventario: "", cantidad: "", fecha: "" });
+  const [form, setForm] = useState({ ...FORM_VACIO, fecha: hoy() });
   const [ventas, setVentas] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
+  const [filtroFecha, setFiltroFecha] = useState("");
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -17,7 +21,7 @@ export default function Ventas() {
         axiosClient.get("/inventario"),
       ]);
       setClientes(resClientes.data);
-      setInventario(resInventario.data); // RF-17: mostrar stock disponible en UI
+      setInventario(resInventario.data);
     } catch (err) {
       setError(err.message);
     }
@@ -25,7 +29,7 @@ export default function Ventas() {
 
   async function cargarVentas() {
     try {
-      const { data } = await axiosClient.get("/ventas", { params: { cliente: filtroCliente } }); // RF-20/22
+      const { data } = await axiosClient.get("/ventas", { params: { cliente: filtroCliente, fecha: filtroFecha || undefined } }); // RF-20/RF-22
       setVentas(data);
     } catch (err) {
       setError(err.message);
@@ -44,13 +48,13 @@ export default function Ventas() {
         idInventario: Number(form.idInventario),
         cantidad: Number(form.cantidad),
         fecha: form.fecha,
-      }); // RF-14 a RF-19
+      });
       setMensaje("Venta registrada. El inventario se descontó automáticamente.");
-      setForm({ idCliente: "", idInventario: "", cantidad: "", fecha: "" });
+      setForm({ ...FORM_VACIO, fecha: form.fecha });
       cargarListas();
       cargarVentas();
     } catch (err) {
-      setError(err.message); // RF-18: "Stock insuficiente para..."
+      setError(err.message);
     }
   }
 
@@ -67,13 +71,13 @@ export default function Ventas() {
         <select value={form.idInventario} onChange={(e) => setForm({ ...form, idInventario: e.target.value })} required>
           <option value="">-- Producto --</option>
           {inventario.map((i) => (
-            <option key={i.idInventario} value={i.idInventario}>
+            <option key={i.idInventario} value={i.idInventario} disabled={i.cantidadDisponible <= 0}>
               {i.nombreProducto} (disponible: {i.cantidadDisponible})
             </option>
           ))}
         </select>
 
-        <input type="number" step="0.01" placeholder="Cantidad" value={form.cantidad}
+        <input type="number" step="0.01" min="0.01" placeholder="Cantidad" value={form.cantidad}
           onChange={(e) => setForm({ ...form, cantidad: e.target.value })} required />
         <input type="date" value={form.fecha}
           onChange={(e) => setForm({ ...form, fecha: e.target.value })} required />
@@ -87,6 +91,7 @@ export default function Ventas() {
       <input placeholder="Filtrar por cliente" value={filtroCliente}
         onChange={(e) => setFiltroCliente(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && cargarVentas()} />
+      <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} />
       <button onClick={cargarVentas}>Buscar</button>
 
       <table border="1" cellPadding="6" style={{ marginTop: "0.5rem" }}>
@@ -96,7 +101,7 @@ export default function Ventas() {
             v.detalles.map((d, idx) => (
               <tr key={`${v.idVenta}-${idx}`}>
                 <td>{v.nombreCliente}</td>
-                <td>{new Date(v.fecha).toLocaleDateString()}</td>
+                <td>{formatearFecha(v.fecha)}</td>
                 <td>{d.nombreProducto}</td>
                 <td>{d.cantidad}</td>
               </tr>

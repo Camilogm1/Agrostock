@@ -10,6 +10,7 @@ export default function Inventario() {
     try {
       const { data } = await axiosClient.get("/inventario", { params: { filtro } });
       setItems(data);
+      setError("");
     } catch (err) {
       setError(err.message);
     }

@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
+import { formatearFecha } from "../utils/fechas";
 
 const FORM_VACIO = { nombre: "", tipo: "", lote: "", fechaSiembra: "" };
 
 export default function Cultivos() {
-  const { usuario } = useAuth();
-  const esAdmin = usuario?.rol === "Administrador";
+  const { esAdmin } = useAuth();
 
   const [cultivos, setCultivos] = useState([]);
   const [form, setForm] = useState(FORM_VACIO);
-  const [editandoId, setEditandoId] = useState(null); // RF-03 / HU-09
+  const [editandoId, setEditandoId] = useState(null);
   const [error, setError] = useState("");
 
   async function cargar() {
@@ -56,12 +56,14 @@ export default function Cultivos() {
     setForm(FORM_VACIO);
   }
 
-  async function handleEliminar(id) {
+  async function handleEliminar(cultivo) {
+    if (!window.confirm(`¿Eliminar el cultivo "${cultivo.nombre}"?`)) return;
+    setError("");
     try {
-      await axiosClient.delete(`/cultivos/${id}`); // RF-04
+      await axiosClient.delete(`/cultivos/${cultivo.idCultivo}`); // RF-04
       cargar();
     } catch (err) {
-      setError(err.message); // ej: "tiene cosechas asociadas"
+      setError(err.message);
     }
   }
 
@@ -96,11 +98,11 @@ export default function Cultivos() {
               <td>{c.nombre}</td>
               <td>{c.tipo}</td>
               <td>{c.lote}</td>
-              <td>{new Date(c.fechaSiembra).toLocaleDateString()}</td>
+              <td>{formatearFecha(c.fechaSiembra)}</td>
               {esAdmin && (
                 <td>
                   <button onClick={() => handleEditar(c)}>Editar</button>{" "}
-                  <button onClick={() => handleEliminar(c.idCultivo)}>Eliminar</button>
+                  <button onClick={() => handleEliminar(c)}>Eliminar</button>
                 </td>
               )}
             </tr>

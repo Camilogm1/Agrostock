@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../api/axiosClient";
+import { formatearFecha, hoy } from "../utils/fechas";
 
 export default function Cosechas() {
   const [cultivos, setCultivos] = useState([]);
-  const [form, setForm] = useState({ idCultivo: "", cantidad: "", fecha: "" });
+  const [form, setForm] = useState({ idCultivo: "", cantidad: "", fecha: hoy() });
   const [historial, setHistorial] = useState([]);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -38,12 +39,12 @@ export default function Cosechas() {
         idCultivo: Number(form.idCultivo),
         cantidad: Number(form.cantidad),
         fecha: form.fecha,
-      }); // RF-05/06/07
+      });
       setMensaje("Cosecha registrada. El inventario se actualizó automáticamente.");
       cargarHistorial(form.idCultivo);
-      setForm({ ...form, cantidad: "", fecha: "" });
+      setForm({ ...form, cantidad: "" });
     } catch (err) {
-      setError(err.message); // ej: RF-10 cultivo inexistente
+      setError(err.message);
     }
   }
 
@@ -54,7 +55,7 @@ export default function Cosechas() {
       <form onSubmit={handleSubmit} style={{ marginBottom: "1rem" }}>
         <select
           value={form.idCultivo}
-          onChange={(e) => { setForm({ ...form, idCultivo: e.target.value }); cargarHistorial(e.target.value); }}
+          onChange={(e) => { setForm({ ...form, idCultivo: e.target.value }); setMensaje(""); cargarHistorial(e.target.value); }}
           required
         >
           <option value="">-- Selecciona un cultivo --</option>
@@ -62,7 +63,7 @@ export default function Cosechas() {
             <option key={c.idCultivo} value={c.idCultivo}>{c.nombre} ({c.lote})</option>
           ))}
         </select>
-        <input type="number" step="0.01" placeholder="Cantidad cosechada" value={form.cantidad}
+        <input type="number" step="0.01" min="0.01" placeholder="Cantidad cosechada" value={form.cantidad}
           onChange={(e) => setForm({ ...form, cantidad: e.target.value })} required />
         <input type="date" value={form.fecha}
           onChange={(e) => setForm({ ...form, fecha: e.target.value })} required />
@@ -79,7 +80,7 @@ export default function Cosechas() {
           {historial.map((h) => (
             <tr key={h.idCosecha}>
               <td>{h.cantidad}</td>
-              <td>{new Date(h.fecha).toLocaleDateString()}</td>
+              <td>{formatearFecha(h.fecha)}</td>
             </tr>
           ))}
         </tbody>
