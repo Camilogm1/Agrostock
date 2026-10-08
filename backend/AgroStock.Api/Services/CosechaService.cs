@@ -15,11 +15,11 @@ namespace AgroStock.Api.Services
         {
             if (request.Cantidad <= 0)
                 throw new ArgumentException("La cantidad cosechada debe ser mayor a cero."); // RF-06
+            if (request.Fecha == default)
+                throw new ArgumentException("La fecha de la cosecha es obligatoria.");
 
             var cultivo = await _db.Cultivos.FindAsync(request.IdCultivo)
                 ?? throw new NotFoundException($"Cultivo {request.IdCultivo} no encontrado."); // RF-10
-
-            await using var transaction = await _db.Database.BeginTransactionAsync();
 
             var cosecha = new Cosecha
             {
@@ -37,8 +37,8 @@ namespace AgroStock.Api.Services
             }
             inventario.IncrementarStock(request.Cantidad); // RF-07
 
+            // Un solo SaveChanges = una transacción: la cosecha y el stock se guardan juntos o ninguno.
             await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
 
             return new CosechaResponse(cosecha.IdCosecha, cosecha.IdCultivo, cosecha.Cantidad, cosecha.Fecha);
         }

@@ -13,26 +13,18 @@ namespace AgroStock.Api.Services
 
         public async Task<CultivoResponse> RegistrarAsync(CultivoRequest request)
         {
-            // RNF-06: validar campos obligatorios
-            if (string.IsNullOrWhiteSpace(request.Nombre))
-                throw new ArgumentException("El nombre del cultivo es obligatorio.");
-            if (string.IsNullOrWhiteSpace(request.Tipo))
-                throw new ArgumentException("El tipo del cultivo es obligatorio.");
-            if (string.IsNullOrWhiteSpace(request.Lote))
-                throw new ArgumentException("El lote del cultivo es obligatorio.");
+            Validar(request);
 
             var cultivo = new Cultivo
             {
-                Nombre = request.Nombre,
-                Tipo = request.Tipo,
-                Lote = request.Lote,
+                Nombre = request.Nombre.Trim(),
+                Tipo = request.Tipo.Trim(),
+                Lote = request.Lote.Trim(),
                 FechaSiembra = request.FechaSiembra
             };
             _db.Cultivos.Add(cultivo);
-            await _db.SaveChangesAsync();
-
-            // Inventario inicial en 0, ligado 1-1 al cultivo recién creado
-            _db.Inventarios.Add(new Inventario { IdCultivo = cultivo.IdCultivo, CantidadDisponible = 0 });
+            // RF-01: todo cultivo nace con su inventario en 0 (se guardan juntos en un solo SaveChanges)
+            _db.Inventarios.Add(new Inventario { Cultivo = cultivo, CantidadDisponible = 0 });
             await _db.SaveChangesAsync();
 
             return ToResponse(cultivo);
@@ -41,18 +33,21 @@ namespace AgroStock.Api.Services
         public async Task<List<CultivoResponse>> ListarAsync()
         {
             return await _db.Cultivos
+                .OrderBy(c => c.Nombre)
                 .Select(c => new CultivoResponse(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra))
                 .ToListAsync();
         }
 
         public async Task<CultivoResponse> ModificarAsync(int idCultivo, CultivoRequest request)
         {
+            Validar(request);
+
             var cultivo = await _db.Cultivos.FindAsync(idCultivo)
                 ?? throw new NotFoundException($"Cultivo {idCultivo} no encontrado.");
 
-            cultivo.Nombre = request.Nombre;
-            cultivo.Tipo = request.Tipo;
-            cultivo.Lote = request.Lote;
+            cultivo.Nombre = request.Nombre.Trim();
+            cultivo.Tipo = request.Tipo.Trim();
+            cultivo.Lote = request.Lote.Trim();
             cultivo.FechaSiembra = request.FechaSiembra;
 
             await _db.SaveChangesAsync();
@@ -69,6 +64,11 @@ namespace AgroStock.Api.Services
             if (cultivo.Cosechas.Any())
                 throw new CultivoConCosechasException(idCultivo); // RF-04
 
+            // Sin cosechas el inventario está en 0 y no tiene ventas, así que se elimina con el cultivo.
+            var inventario = await _db.Inventarios.FirstOrDefaultAsync(i => i.IdCultivo == idCultivo);
+            if (inventario is not null)
+                _db.Inventarios.Remove(inventario);
+
             _db.Cultivos.Remove(cultivo);
             await _db.SaveChangesAsync();
         }
@@ -83,6 +83,19 @@ namespace AgroStock.Api.Services
                 .OrderBy(co => co.Fecha)
                 .Select(co => new CosechaResponse(co.IdCosecha, co.IdCultivo, co.Cantidad, co.Fecha))
                 .ToListAsync();
+        }
+
+        // RNF-06: campos obligatorios
+        private static void Validar(CultivoRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Nombre))
+                throw new ArgumentException("El nombre del cultivo es obligatorio.");
+            if (string.IsNullOrWhiteSpace(request.Tipo))
+                throw new ArgumentException("El tipo del cultivo es obligatorio.");
+            if (string.IsNullOrWhiteSpace(request.Lote))
+                throw new ArgumentException("El lote del cultivo es obligatorio.");
+            if (request.FechaSiembra == default)
+                throw new ArgumentException("La fecha de siembra es obligatoria.");
         }
 
         private static CultivoResponse ToResponse(Cultivo c) =>

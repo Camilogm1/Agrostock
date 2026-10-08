@@ -18,10 +18,6 @@ namespace AgroStock.Api.Controllers
 
         [HttpPost]
         public async Task<IActionResult> Registrar(ClienteRequest request)
-        {
-            try { return Ok(await _service.RegistrarAsync(request)); }
-            catch (ArgumentException ex) { return BadRequest(new { mensaje = ex.Message }); }
-            catch (InvalidOperationException ex) { return Conflict(new { mensaje = ex.Message }); }
-        }
+            => StatusCode(StatusCodes.Status201Created, await _service.RegistrarAsync(request));
     }
 }
