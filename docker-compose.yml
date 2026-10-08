@@ -1,0 +1,13 @@
+services:
+  db:
+    image: mariadb:11
+    container_name: agrostock_db
+    environment:
+      MARIADB_ROOT_PASSWORD: agrostock123
+      MARIADB_DATABASE: agrostock
+    ports:
+      - "3306:3306"
+    volumes:
+      - agrostock_data:/var/lib/mysql
+volumes:
+  agrostock_data:

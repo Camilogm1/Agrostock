@@ -13,10 +13,10 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restaurar dependencias
-        run: dotnet restore AgroStockTaller.sln
+        run: dotnet restore backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj
 
       - name: Compilar
-        run: dotnet build AgroStockTaller.sln --no-restore --configuration Release
+        run: dotnet build backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj --no-restore --configuration Release
 
       - name: Ejecutar pruebas
-        run: dotnet test tests/AgroStockTaller.Tests/AgroStockTaller.Tests.csproj --no-build --configuration Release --verbosity normal
+        run: dotnet test backend/AgroStock.Api.Tests/AgroStock.Api.Tests.csproj --no-build --configuration Release --verbosity normal
