@@ -43,5 +43,13 @@ namespace AgroStockTaller.Api.Services
                 .Select(c => new CultivoResponse(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra))
                 .ToListAsync();
         }
+
+        public async Task<CultivoResponse?> ObtenerPorIdAsync(int id)
+        {
+            return await _db.Cultivos
+                .Where(c => c.IdCultivo == id)
+                .Select(c => new CultivoResponse(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra))
+                .FirstOrDefaultAsync();
+        }
     }
 }

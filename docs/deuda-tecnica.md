@@ -1,0 +1,11 @@
+# Registro de deuda técnica
+
+Estimaciones preliminares en días-persona para una persona familiarizada con el repo; deben revisarse con el equipo. Los cuadrantes combinan deliberada/inadvertida y prudente/imprudente.
+
+| ID | Deuda y evidencia | Cuadrante | Costo estimado | Plan de pago |
+|---|---|---|---:|---|
+| DT-01 | El prototipo usa EF Core InMemory: los datos se pierden al reiniciar y no se ejercitan las restricciones ni triggers de MariaDB. | Deliberada / prudente: simplifica la demo autocontenida, pero limita su uso como aplicación. | 2-3 días | Cuando se autorice persistencia real, agregar un proveedor relacional, configuración local y pruebas de integración; conservar InMemory solo para pruebas unitarias si sigue aportando valor. |
+| DT-02 | La implementación es .NET y la API solo cubre cultivos; los modelos describen React, Laravel/Eloquent, MariaDB y otros módulos. | Deliberada / imprudente para una entrega que pretenda representar el producto completo: la diferencia ya es conocida y queda visible en ADR-0001. | 3-5 días | Confirmar alcance con el equipo; si el stack del repo es el definitivo, actualizar los modelos en una revisión posterior; si los modelos mandan, planificar migración por módulos y no declarar equivalencia antes de implementarla. |
+| DT-03 | `RegistrarAsync` guarda cultivo e inventario en llamadas separadas a `SaveChangesAsync`; una falla en la segunda puede dejar estado parcial con un proveedor relacional. | Inadvertida / imprudente: no hay transacción en la operación. | 0.5-1 día | Al añadir persistencia relacional, envolver ambas escrituras en una transacción y probar rollback con una base relacional. EF Core InMemory no permite validar esta propiedad. |
+
+La clasificación es una lectura del estado actual, no una decisión histórica del equipo. Fuentes: [ADR-0001](adr/0001-stack-del-prototipo.md), [ADR-0003](adr/0003-inventario-inicial-en-cero.md), [servicio](../src/AgroStockTaller.Api/Services/CultivoService.cs), [proyecto API](../src/AgroStockTaller.Api/AgroStockTaller.Api.csproj) y [script MariaDB](../Base%20de%20datosV2.txt).

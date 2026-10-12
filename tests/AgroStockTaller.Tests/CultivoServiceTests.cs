@@ -45,18 +45,26 @@ namespace AgroStockTaller.Tests
         // PRUEBA 2 — RNF-06: validar que los campos obligatorios no se
         // guarden vacíos.
         // ============================================================
-        [Fact]
-        public async Task RegistrarAsync_SinNombre_DeberiaFallarLaValidacion()
+        [Theory]
+        [InlineData("", "Hortaliza", "Lote-A1", "nombre")]
+        [InlineData("Tomate", " ", "Lote-A1", "tipo")]
+        [InlineData("Tomate", "Hortaliza", "", "lote")]
+        public async Task RegistrarAsync_ConCampoObligatorioVacio_NoRegistraDatos(
+            string nombre,
+            string tipo,
+            string lote,
+            string campoInvalido)
         {
             await using var db = CrearDbContext();
             var service = new CultivoService(db);
-            var request = new CultivoRequest("", "Hortaliza", "Lote-A1", new DateTime(2026, 3, 1));
+            var request = new CultivoRequest(nombre, tipo, lote, new DateTime(2026, 3, 1));
 
             var excepcion = await Assert.ThrowsAsync<ArgumentException>(
                 () => service.RegistrarAsync(request));
 
-            Assert.Contains("nombre", excepcion.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(campoInvalido, excepcion.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Empty(db.Cultivos);
+            Assert.Empty(db.Inventarios);
         }
 
         // ============================================================
@@ -75,6 +83,32 @@ namespace AgroStockTaller.Tests
             Assert.Equal(2, resultado.Count);
             Assert.Contains(resultado, c => c.Nombre == "Tomate Chonto");
             Assert.Contains(resultado, c => c.Nombre == "Maíz");
+        }
+
+        [Fact]
+        public async Task ObtenerPorIdAsync_ConCultivoRegistrado_DevuelveElCultivo()
+        {
+            await using var db = CrearDbContext();
+            var service = new CultivoService(db);
+            var registrado = await service.RegistrarAsync(
+                new CultivoRequest("Tomate", "Hortaliza", "Lote-A1", new DateTime(2026, 3, 1)));
+
+            var resultado = await service.ObtenerPorIdAsync(registrado.IdCultivo);
+
+            Assert.NotNull(resultado);
+            Assert.Equal(registrado.IdCultivo, resultado.IdCultivo);
+            Assert.Equal("Tomate", resultado.Nombre);
+        }
+
+        [Fact]
+        public async Task ObtenerPorIdAsync_SinCoincidencia_DevuelveNull()
+        {
+            await using var db = CrearDbContext();
+            var service = new CultivoService(db);
+
+            var resultado = await service.ObtenerPorIdAsync(999);
+
+            Assert.Null(resultado);
         }
     }
 }

@@ -14,6 +14,13 @@ namespace AgroStockTaller.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> Listar() => Ok(await _service.ListarAsync());
 
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> ObtenerPorId(int id)
+        {
+            var cultivo = await _service.ObtenerPorIdAsync(id);
+            return cultivo is null ? NotFound() : Ok(cultivo);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Registrar(CultivoRequest request)
         {
