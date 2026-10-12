@@ -42,14 +42,18 @@ Debe mostrar 7 casos aprobados y ninguno fallido.
 - [Nota de uso de IA](docs/nota-uso-ia.md)
 - [Modelos editables](docs/modelos/)
 - [Documento consolidado en PDF](docs/entrega-consolidada.pdf)
+- [Versión editable en Word](docs/entrega-consolidada.docx)
 
-Al contrastar los modelos solicitados con las fuentes recibidas, no se encontró
-un diagrama de clases renderizado: la pestaña con ese nombre en los SVG no
-contiene clases ni relaciones. Está registrado como pendiente en la trazabilidad.
+El Modelo 2 (diagrama de clases) se consulta desde
+[Google Drive](https://drive.google.com/file/d/1EtywC6Lw0LVnIORtykZYBzBQQKQpjeBf/view?usp=sharing).
+Para visualizarlo con facilidad, abre el enlace con draw.io (diagrams.net). La
+pestaña homónima de los SVG locales solo contiene una anotación.
 
 Para regenerar el PDF en Windows, instala las dependencias con
 `py -m pip install -r docs/requirements-pdf.txt` y ejecuta
 `py scripts/build_delivery_pdf.py`. Se requiere Microsoft Edge o Google Chrome.
+Para regenerar la versión editable en Word, instala `docs/requirements-word.txt`
+y ejecuta `py scripts/build_delivery_docx.py`.
 
 
 ## Integrantes

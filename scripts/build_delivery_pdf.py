@@ -51,12 +51,13 @@ SECTIONS = [
 ]
 
 DIAGRAMS = [
-    ("Diagrama de caso de uso", "Agrostock-Caso de uso.drawio.svg"),
-    ("Diagrama C4: nivel 1", "Agrostock-C4 Nivel 1.drawio.svg"),
-    ("Diagrama C4: nivel 2", "Agrostock- C4 Nivel 2.drawio.svg"),
-    ("Componentes y despliegue", "Agrostock-Diagrama de componentes y despliegue.drawio.svg"),
-    ("Diagrama de secuencia", "Agrostock-Diagrama de secuencia.drawio.svg"),
+    ("Modelo 1. Diagrama de caso de uso", "Agrostock-Caso de uso.drawio.svg"),
+    ("Modelo 3. Diagrama de secuencia", "Agrostock-Diagrama de secuencia.drawio.svg"),
+    ("Modelo 4. Componentes y despliegue", "Agrostock-Diagrama de componentes y despliegue.drawio.svg"),
+    ("Modelo 5. Diagrama C4: nivel 1", "Agrostock-C4 Nivel 1.drawio.svg"),
+    ("Modelo 6. Diagrama C4: nivel 2", "Agrostock- C4 Nivel 2.drawio.svg"),
 ]
+CLASS_DIAGRAM_URL = "https://drive.google.com/file/d/1EtywC6Lw0LVnIORtykZYBzBQQKQpjeBf/view?usp=sharing"
 
 styles = getSampleStyleSheet()
 styles.add(ParagraphStyle(
@@ -260,12 +261,12 @@ def build_pdf() -> None:
             Paragraph("Entrega 2<br/>Ingeniería de Software", styles["CoverSubtitle"]),
             Spacer(1, 25 * mm),
             Paragraph("Equipo", styles["Subsection"]),
-            Paragraph("Juan Felipe Cardona<br/>Juan Camilo González<br/>Daniel Villa", styles["CoverSubtitle"]),
+            Paragraph("Juan Felipe Cardona<br/>Camilo González<br/>Daniel Villa", styles["CoverSubtitle"]),
             Spacer(1, 16 * mm),
             Paragraph(date.today().strftime("%Y-%m-%d"), styles["CoverSubtitle"]),
             Spacer(1, 8 * mm),
             Paragraph(
-                '<link href="https://github.com/Camilogm1/Agrostock/tree/Daniel" color="#176B55">Repositorio: Camilogm1/Agrostock, rama Daniel</link>',
+                '<link href="https://github.com/Camilogm1/Agrostock" color="#176B55">Repositorio: Camilogm1/Agrostock</link>',
                 styles["CoverSubtitle"],
             ),
             PageBreak(),
@@ -279,18 +280,29 @@ def build_pdf() -> None:
             story.append(Paragraph(inline_markup(title), styles["SectionTitle"]))
             if title.startswith("1."):
                 story.append(Paragraph(
-                    "El taller solicita seis modelos: caso de uso, clases, secuencia, componentes y despliegue, C4 nivel 1 y C4 nivel 2. Se encontraron cinco diagramas renderizados, listados abajo. Aunque los SVG incluyen una pestaña llamada 'Diagrama de clases', su XML no contiene elementos de clase ni relaciones; falta la fuente visual de ese modelo para completar este requisito.",
+                    "El taller solicita seis modelos. El diagrama de clases se entrega como Modelo 2 mediante el enlace de Drive de la página siguiente. La pestaña con ese nombre en los SVG locales contiene solo una anotación; el modelo vinculado es el que debe usarse para su visualización.",
                     styles["BodySmall"],
                 ))
                 story.append(PageBreak())
-                for caption, filename in DIAGRAMS:
+                for diagram_index, (caption, filename) in enumerate(DIAGRAMS):
                     marker = f"DIAGRAM_PLACEHOLDER:{filename}"
                     story.append(Paragraph(inline_markup(caption), styles["Subsection"]))
                     story.append(Paragraph(marker, styles["BodySmall"]))
                     story.append(PageBreak())
+                    if diagram_index == 0:
+                        story.append(Paragraph("Modelo 2. Diagrama de clases", styles["SectionTitle"]))
+                        story.append(Paragraph(
+                            f'<link href="{CLASS_DIAGRAM_URL}" color="#176B55">Abrir el Modelo 2 en Google Drive</link>',
+                            styles["BodySmall"],
+                        ))
+                        story.append(Paragraph(
+                            "Para visualizarlo con facilidad, abre el enlace con draw.io (diagrams.net).",
+                            styles["BodySmall"],
+                        ))
+                        story.append(PageBreak())
             elif title.startswith("10."):
                 story.extend([
-                    Paragraph("Este PDF consolida los componentes disponibles de la entrega. Las cinco fuentes SVG están en `docs/modelos/`; falta incorporar la fuente visual del diagrama de clases. Las instrucciones del generador y sus dependencias están en `scripts/build_delivery_pdf.py` y `docs/requirements-pdf.txt`.", styles["BodySmall"]),
+                    Paragraph("Este PDF consolida los componentes de la entrega. Las cinco fuentes SVG están en `docs/modelos/`; el Modelo 2 se consulta desde el enlace externo de Google Drive. Las instrucciones del generador y sus dependencias están en `scripts/build_delivery_pdf.py` y `docs/requirements-pdf.txt`.", styles["BodySmall"]),
                     Paragraph("Para regenerarlo desde la raíz del repositorio:", styles["Subsection"]),
                     Paragraph("py -m pip install -r docs/requirements-pdf.txt<br/>py scripts/build_delivery_pdf.py", styles["BodySmall"]),
                     Paragraph("El prototipo es una API .NET autocontenida. El alcance y las diferencias respecto a los modelos están descritos en ADR-0001 y la matriz de riesgos; no se presenta como implementación completa de React/Laravel/MariaDB.", styles["BodySmall"]),
