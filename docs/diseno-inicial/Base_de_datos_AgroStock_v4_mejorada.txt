@@ -1,0 +1,476 @@
+-- =====================================================================
+-- AgroStock — Script de Base de Datos (v4 MEJORADA)
+-- Motor: MariaDB 10.x / MySQL 8.x
+-- Módulos: Producción e Inventario | Comercial | Seguridad | Auditoria
+-- Trazabilidad: cada tabla/columna referencia el RF/RNF/HU que satisface
+-- 
+-- CAMBIOS EN v4:
+-- ✅ ELIMINADOS todos los triggers (lógica vive en backend C#)
+-- ✅ NUEVA tabla: auditoria (quién, qué, cuándo)
+-- ✅ NUEVA tabla: inventario_movimientos (por qué cambió el stock)
+-- ✅ MEJORADA cultivos (campos agrícolas, sin redundancias)
+-- ✅ MEJORADA clientes (comercial, crédito, contactos)
+-- ✅ MEJORADA ventas (estado pago, métodos)
+-- ✅ MEJORADA usuarios (seguridad, email, login tracking)
+-- ✅ AGREGADOS índices de performance para reportes y búsquedas
+-- ✅ AGREGADAS vistas útiles (v_inventario_actual, v_ventas_mensuales)
+-- =====================================================================
+
+CREATE DATABASE IF NOT EXISTS agrostock
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE agrostock;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- =====================================================================
+-- 1. USUARIOS Y ROLES  →  RNF-01 (autenticación), RNF-02 (roles)
+--    MEJORADO: email, tracking de login, bloqueo de seguridad
+-- =====================================================================
+DROP TABLE IF EXISTS usuarios;
+CREATE TABLE usuarios (
+    id_usuario              INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_completo         VARCHAR(120)    NOT NULL,
+    nombre_usuario          VARCHAR(50)     NOT NULL UNIQUE,
+    email                   VARCHAR(120)    UNIQUE,              -- para reset de contraseña (v4)
+    contrasena_hash         VARCHAR(255)    NOT NULL,            -- nunca texto plano
+    rol                     ENUM('administrador','vendedor') NOT NULL,  -- RNF-02
+    activo                  BOOLEAN         NOT NULL DEFAULT TRUE,
+    ultimo_login            TIMESTAMP NULL,                      -- cuándo entró por última vez (v4)
+    intentos_fallidos       INT             NOT NULL DEFAULT 0,  -- contador de intentos (v4)
+    bloqueado_hasta         TIMESTAMP NULL,                      -- bloqueo temporal por seguridad (v4)
+    fecha_creacion          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                            ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_usuarios_nombre_usuario UNIQUE (nombre_usuario),
+    CONSTRAINT uq_usuarios_email UNIQUE (email)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_usuarios_activo ON usuarios(activo);
+CREATE INDEX idx_usuarios_rol ON usuarios(rol);
+
+
+-- =====================================================================
+-- 2. CULTIVOS  →  RF-01, RF-02, RF-03, RF-04
+--    MEJORADO: tipo cultivo, precio estimado, sin campo "ubicacion" (redundante)
+-- =====================================================================
+DROP TABLE IF EXISTS cultivos;
+CREATE TABLE cultivos (
+    id_cultivo              INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_cultivo          VARCHAR(100)    NOT NULL,            -- ej: Tomate
+    tipo_cultivo            VARCHAR(50),                          -- 'hortaliza', 'fruta', 'grano' (v4)
+    variedad                VARCHAR(100),                         -- ej: Chonto
+    lote                    VARCHAR(50)     NOT NULL,             -- ej: Lote 1 (ahora es la ubicación)
+    cantidad_sembrada       INT             NOT NULL,             -- ej: 500 plantas
+    fecha_siembra           DATE            NOT NULL,
+    fecha_estimada_cosecha  DATE,
+    area_cultivada          DECIMAL(10,2),                        -- ej: 200
+    unidad_area             VARCHAR(10)     NOT NULL DEFAULT 'm2',
+    precio_estimado_kg      DECIMAL(10,2),                        -- para proyecciones de venta (v4)
+    notas_adicionales       TEXT,                                 -- observaciones agrícolas (v4)
+    estado                  ENUM('en_crecimiento','listo_para_cosecha',
+                                 'cosechado','cancelado')
+                            NOT NULL DEFAULT 'en_crecimiento',
+    id_usuario_registro     INT             NOT NULL,             -- quién lo registró (RNF-02)
+    fecha_creacion          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                            ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cultivos_usuario FOREIGN KEY (id_usuario_registro)
+        REFERENCES usuarios(id_usuario),
+    CONSTRAINT chk_cultivos_cantidad_sembrada CHECK (cantidad_sembrada >= 0),   -- RNF-06
+    CONSTRAINT chk_cultivos_area CHECK (area_cultivada IS NULL OR area_cultivada >= 0),
+    CONSTRAINT chk_cultivos_precio CHECK (precio_estimado_kg IS NULL OR precio_estimado_kg >= 0),
+    CONSTRAINT chk_cultivos_nombre_no_vacio CHECK (CHAR_LENGTH(TRIM(nombre_cultivo)) > 0),
+    CONSTRAINT chk_cultivos_lote_no_vacio CHECK (CHAR_LENGTH(TRIM(lote)) > 0)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_cultivos_lote ON cultivos(lote);                -- RNF-03 (consultas rápidas)
+CREATE INDEX idx_cultivos_estado ON cultivos(estado);
+CREATE INDEX idx_cultivos_usuario ON cultivos(id_usuario_registro);  -- v4: para reportes por usuario
+CREATE INDEX idx_cultivos_estado_fecha ON cultivos(estado, fecha_creacion);  -- v4: para dashboards
+
+
+-- =====================================================================
+-- 3. COSECHAS  →  RF-05, RF-06, RF-10, RF-11
+-- =====================================================================
+DROP TABLE IF EXISTS cosechas;
+CREATE TABLE cosechas (
+    id_cosecha              INT AUTO_INCREMENT PRIMARY KEY,
+    id_cultivo              INT             NOT NULL,             -- RF-10: FK obliga a que exista
+    fecha_cosecha           DATE            NOT NULL,
+    cantidad_cosechada      DECIMAL(10,2)   NOT NULL,             -- ej: 50 kg
+    unidad_medida           VARCHAR(10)     NOT NULL DEFAULT 'kg',
+    calidad                 ENUM('primera','segunda','tercera')
+                            NOT NULL DEFAULT 'primera',
+    lote                    VARCHAR(50),                          -- ej: Lote 1
+    observaciones           VARCHAR(255),                         -- ej: "Sin daños"
+    id_usuario_registro     INT             NOT NULL,
+    fecha_creacion          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                            ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cosechas_cultivo FOREIGN KEY (id_cultivo)
+        REFERENCES cultivos(id_cultivo)
+        ON DELETE RESTRICT,                                       -- RF-04: no se puede borrar cultivo con cosechas
+    CONSTRAINT fk_cosechas_usuario FOREIGN KEY (id_usuario_registro)
+        REFERENCES usuarios(id_usuario),
+    CONSTRAINT chk_cosechas_cantidad_positiva CHECK (cantidad_cosechada > 0)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_cosechas_cultivo ON cosechas(id_cultivo);        -- RF-11: historial + RNF-03
+CREATE INDEX idx_cosechas_fecha ON cosechas(fecha_cosecha);
+CREATE INDEX idx_cosechas_periodo ON cosechas(id_cultivo, fecha_cosecha);  -- v4: para filtros por período
+
+
+-- =====================================================================
+-- 4. INVENTARIO  →  RF-07, RF-08, RF-09
+--    Una fila por cultivo/producto; se actualiza SOLO desde backend,
+--    NUNCA manualmente, para garantizar consistencia (RG-06/RNF-07)
+-- =====================================================================
+DROP TABLE IF EXISTS inventario;
+CREATE TABLE inventario (
+    id_inventario           INT AUTO_INCREMENT PRIMARY KEY,
+    id_cultivo              INT             NOT NULL,
+    cantidad_disponible     DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    unidad_medida           VARCHAR(10)     NOT NULL DEFAULT 'kg',
+    fecha_actualizacion     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                            ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_inventario_cultivo FOREIGN KEY (id_cultivo)
+        REFERENCES cultivos(id_cultivo)
+        ON DELETE RESTRICT,
+    CONSTRAINT uq_inventario_cultivo UNIQUE (id_cultivo),        -- 1 registro de stock por cultivo
+    CONSTRAINT chk_inventario_no_negativo CHECK (cantidad_disponible >= 0)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_inventario_cantidad ON inventario(cantidad_disponible);  -- v4: para alertas de stock bajo
+
+
+-- =====================================================================
+-- 5. INVENTARIO_MOVIMIENTOS (NUEVA EN v4)  →  Trazabilidad de cambios
+--    Registra POR QUÉ cambió el stock (cosecha, venta, ajuste manual)
+-- =====================================================================
+DROP TABLE IF EXISTS inventario_movimientos;
+CREATE TABLE inventario_movimientos (
+    id_movimiento           INT AUTO_INCREMENT PRIMARY KEY,
+    id_cultivo              INT             NOT NULL,
+    tipo_movimiento         ENUM('cosecha','venta','ajuste_manual')
+                            NOT NULL,
+    cantidad_cambio         DECIMAL(10,2)   NOT NULL,             -- positivo (entrada) o negativo (salida)
+    referencia_id           INT,                                  -- id_cosecha o id_venta
+    referencia_tipo         VARCHAR(50),                          -- 'cosecha' o 'venta'
+    observaciones           VARCHAR(255),
+    id_usuario              INT             NOT NULL,
+    fecha_movimiento        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_mov_cultivo FOREIGN KEY (id_cultivo)
+        REFERENCES cultivos(id_cultivo),
+    CONSTRAINT fk_mov_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuarios(id_usuario),
+    CONSTRAINT chk_mov_cantidad_no_cero CHECK (cantidad_cambio != 0)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_movimientos_cultivo ON inventario_movimientos(id_cultivo);
+CREATE INDEX idx_movimientos_fecha ON inventario_movimientos(fecha_movimiento);
+CREATE INDEX idx_movimientos_tipo ON inventario_movimientos(tipo_movimiento);
+
+
+-- =====================================================================
+-- 6. CLIENTES  →  RF-12, RF-13, RNF-09
+--    MEJORADO: estado, crédito, contactos múltiples
+-- =====================================================================
+DROP TABLE IF EXISTS clientes;
+CREATE TABLE clientes (
+    id_cliente              INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_cliente          VARCHAR(120)    NOT NULL,
+    tipo_identificacion     ENUM('CC','NIT','CE','TI')
+                            NOT NULL DEFAULT 'CC',
+    numero_identificacion   VARCHAR(20)     NOT NULL UNIQUE,      -- RNF-09
+    telefono                VARCHAR(20),
+    correo                  VARCHAR(120),
+    direccion               VARCHAR(150),
+    estado_cliente          ENUM('activo','inactivo','suspendido')
+                            NOT NULL DEFAULT 'activo',             -- v4: para desactivar sin borrar
+    credito_permitido       DECIMAL(12,2)   NOT NULL DEFAULT 0,    -- línea de crédito (v4)
+    saldo_deudor            DECIMAL(12,2)   NOT NULL DEFAULT 0,    -- lo que debe (v4)
+    contacto_principal      VARCHAR(100),                          -- nombre del contacto (v4)
+    contacto_secundario     VARCHAR(100),                          -- backup de contacto (v4)
+    fecha_creacion          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                            ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_clientes_identificacion UNIQUE (numero_identificacion),
+    CONSTRAINT chk_clientes_nombre_no_vacio CHECK (CHAR_LENGTH(TRIM(nombre_cliente)) > 0),
+    CONSTRAINT chk_clientes_credito CHECK (credito_permitido >= 0),
+    CONSTRAINT chk_clientes_saldo CHECK (saldo_deudor >= 0)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_clientes_nombre ON clientes(nombre_cliente);     -- RF-13: búsqueda
+CREATE INDEX idx_clientes_estado ON clientes(estado_cliente);     -- v4: para filtros
+CREATE INDEX idx_clientes_saldo_deudor ON clientes(saldo_deudor); -- v4: para cobranza
+
+
+-- =====================================================================
+-- 7. VENTAS  →  RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-20, RF-21, RF-22
+--    MEJORADO: estado de pago, método de pago, comprobante
+-- =====================================================================
+DROP TABLE IF EXISTS ventas;
+CREATE TABLE ventas (
+    id_venta                INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente              INT             NOT NULL,
+    id_cultivo              INT             NOT NULL,             -- producto vendido
+    cantidad_vendida        DECIMAL(10,2)   NOT NULL,
+    precio_unitario         DECIMAL(12,2)   NOT NULL DEFAULT 0,
+    total                   DECIMAL(14,2)   GENERATED ALWAYS AS
+                            (cantidad_vendida * precio_unitario) STORED,
+    fecha_venta             DATE            NOT NULL,
+    estado_pago             ENUM('pagado','pendiente','parcial')
+                            NOT NULL DEFAULT 'pagado',             -- v4: para control de crédito
+    metodo_pago             ENUM('efectivo','transferencia','cheque','credito'),  -- v4
+    fecha_pago              DATE,                                  -- cuándo se pagó (v4)
+    numero_comprobante      VARCHAR(50) UNIQUE,                   -- factura/recibo (v4)
+    id_usuario_registro     INT             NOT NULL,             -- vendedor
+    fecha_creacion          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ventas_cliente FOREIGN KEY (id_cliente)
+        REFERENCES clientes(id_cliente),
+    CONSTRAINT fk_ventas_cultivo FOREIGN KEY (id_cultivo)
+        REFERENCES cultivos(id_cultivo),
+    CONSTRAINT fk_ventas_usuario FOREIGN KEY (id_usuario_registro)
+        REFERENCES usuarios(id_usuario),
+    CONSTRAINT chk_ventas_cantidad_positiva CHECK (cantidad_vendida > 0),
+    CONSTRAINT chk_ventas_precio_positivo CHECK (precio_unitario >= 0),
+    CONSTRAINT chk_ventas_fecha_pago CHECK (
+        (estado_pago = 'pagado' AND fecha_pago IS NOT NULL) OR
+        (estado_pago IN ('pendiente','parcial') AND fecha_pago IS NULL)
+    )
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_ventas_cliente ON ventas(id_cliente);            -- RF-22: búsqueda por cliente
+CREATE INDEX idx_ventas_fecha ON ventas(fecha_venta);             -- RF-22: búsqueda por fecha
+CREATE INDEX idx_ventas_usuario ON ventas(id_usuario_registro);   -- v4: reportes por vendedor
+CREATE INDEX idx_ventas_cliente_fecha ON ventas(id_cliente, fecha_venta);  -- v4: historial del cliente
+CREATE INDEX idx_ventas_estado_pago ON ventas(estado_pago);       -- v4: cobranza
+
+
+-- =====================================================================
+-- 8. AUDITORIA (NUEVA EN v4)  →  Quién cambió qué y cuándo
+--    Completa trazabilidad para cumplimiento normativo
+-- =====================================================================
+DROP TABLE IF EXISTS auditoria;
+CREATE TABLE auditoria (
+    id_auditoria            INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario              INT,                                  -- quién hizo el cambio
+    tabla_afectada          VARCHAR(50)     NOT NULL,             -- 'cultivos', 'ventas', etc
+    operacion               ENUM('INSERT','UPDATE','DELETE')
+                            NOT NULL,
+    id_registro             INT,                                  -- PK del registro que cambió
+    valores_antes           JSON,                                 -- para UPDATE/DELETE
+    valores_despues         JSON,                                 -- para INSERT/UPDATE
+    ip_usuario              VARCHAR(45),                          -- IPv4 o IPv6
+    fecha_operacion         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuarios(id_usuario) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_auditoria_tabla ON auditoria(tabla_afectada);
+CREATE INDEX idx_auditoria_fecha ON auditoria(fecha_operacion);
+CREATE INDEX idx_auditoria_usuario ON auditoria(id_usuario);
+CREATE INDEX idx_auditoria_operacion ON auditoria(operacion);
+
+
+-- =====================================================================
+-- VISTAS ÚTILES (NUEVAS EN v4)  →  Para reportes y dashboards
+-- =====================================================================
+
+-- Vista: Inventario actual con estado y detalles del cultivo
+DROP VIEW IF EXISTS v_inventario_actual;
+CREATE VIEW v_inventario_actual AS
+SELECT 
+    i.id_inventario,
+    c.id_cultivo,
+    c.nombre_cultivo,
+    c.tipo_cultivo,
+    c.variedad,
+    c.lote,
+    i.cantidad_disponible,
+    i.unidad_medida,
+    c.precio_estimado_kg,
+    (i.cantidad_disponible * c.precio_estimado_kg) AS valor_stock,
+    CASE 
+        WHEN i.cantidad_disponible = 0 THEN 'AGOTADO'
+        WHEN i.cantidad_disponible < 10 THEN 'BAJO'
+        WHEN i.cantidad_disponible < 50 THEN 'MEDIO'
+        ELSE 'NORMAL' 
+    END AS estado_stock,
+    i.fecha_actualizacion
+FROM inventario i
+JOIN cultivos c ON i.id_cultivo = c.id_cultivo
+WHERE c.estado = 'cosechado';
+
+
+-- Vista: Ventas mensuales por totales y cantidad
+DROP VIEW IF EXISTS v_ventas_mensuales;
+CREATE VIEW v_ventas_mensuales AS
+SELECT 
+    DATE_TRUNC(v.fecha_venta, MONTH) AS mes,
+    SUM(v.total) AS total_vendido,
+    COUNT(*) AS num_transacciones,
+    AVG(v.total) AS ticket_promedio,
+    COUNT(DISTINCT v.id_cliente) AS clientes_activos
+FROM ventas v
+GROUP BY DATE_TRUNC(v.fecha_venta, MONTH)
+ORDER BY mes DESC;
+
+
+-- Vista: Deuda por cliente (crédito a cobrar)
+DROP VIEW IF EXISTS v_clientes_con_deuda;
+CREATE VIEW v_clientes_con_deuda AS
+SELECT 
+    c.id_cliente,
+    c.nombre_cliente,
+    c.numero_identificacion,
+    c.saldo_deudor,
+    c.credito_permitido,
+    (c.credito_permitido - c.saldo_deudor) AS credito_disponible,
+    SUM(v.total) AS compras_pendientes,
+    COUNT(v.id_venta) AS num_facturas_pendientes
+FROM clientes c
+LEFT JOIN ventas v ON c.id_cliente = v.id_cliente 
+    AND v.estado_pago IN ('pendiente','parcial')
+WHERE c.saldo_deudor > 0 OR c.estado_cliente = 'suspendido'
+GROUP BY c.id_cliente
+ORDER BY c.saldo_deudor DESC;
+
+
+-- Vista: Historial de movimientos de inventario por cultivo
+DROP VIEW IF EXISTS v_inventario_historial;
+CREATE VIEW v_inventario_historial AS
+SELECT 
+    im.id_movimiento,
+    c.nombre_cultivo,
+    c.variedad,
+    im.tipo_movimiento,
+    im.cantidad_cambio,
+    im.referencia_id,
+    im.observaciones,
+    u.nombre_usuario,
+    im.fecha_movimiento
+FROM inventario_movimientos im
+JOIN cultivos c ON im.id_cultivo = c.id_cultivo
+JOIN usuarios u ON im.id_usuario = u.id_usuario
+ORDER BY im.fecha_movimiento DESC;
+
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- =====================================================================
+-- DATOS DE PRUEBA (seed) — basados en los mockups de la Entrega #1
+-- =====================================================================
+
+INSERT INTO usuarios 
+(nombre_completo, nombre_usuario, email, contrasena_hash, rol, ultimo_login) 
+VALUES
+('Juan Camilo González', 'jgonzalez', 'jgonzalez@agrostock.local', '$2y$10$hashEjemploAdmin', 'administrador', NOW()),
+('Juan Felipe Cardona', 'jcardona', 'jcardona@agrostock.local', '$2y$10$hashEjemploVendedor', 'vendedor', NOW());
+
+
+INSERT INTO cultivos
+(nombre_cultivo, tipo_cultivo, variedad, lote, cantidad_sembrada, fecha_siembra,
+ fecha_estimada_cosecha, area_cultivada, unidad_area, precio_estimado_kg, 
+ notas_adicionales, estado, id_usuario_registro)
+VALUES
+('Tomate', 'hortaliza', 'Chonto', 'Lote 1', 500, '2026-07-15', '2026-10-15', 
+ 200.00, 'm2', 3500.00, 'Primer lote de la temporada, sin plagas detectadas', 
+ 'cosechado', 1);
+
+
+INSERT INTO cosechas
+(id_cultivo, fecha_cosecha, cantidad_cosechada, unidad_medida, calidad, lote, 
+ observaciones, id_usuario_registro)
+VALUES
+(1, '2026-10-15', 50.00, 'kg', 'primera', 'Lote 1', 'Sin daños, clasificación A', 1);
+
+
+-- IMPORTANTE: El inventario se crea automáticamente en el backend
+-- pero para completar el seed, agregamos la entrada manualmente:
+INSERT INTO inventario (id_cultivo, cantidad_disponible, unidad_medida)
+VALUES (1, 50.00, 'kg');
+
+
+-- Registramos el movimiento de cosecha (v4)
+INSERT INTO inventario_movimientos
+(id_cultivo, tipo_movimiento, cantidad_cambio, referencia_id, referencia_tipo, 
+ observaciones, id_usuario, fecha_movimiento)
+VALUES
+(1, 'cosecha', 50.00, 1, 'cosecha', 'Cosecha inicial del Lote 1 - Tomate Chonto', 
+ 1, '2026-10-15 10:30:00');
+
+
+INSERT INTO clientes 
+(nombre_cliente, tipo_identificacion, numero_identificacion, telefono, correo, 
+ direccion, estado_cliente, credito_permitido, contacto_principal)
+VALUES 
+('María Restrepo', 'CC', '1020304050', '3001234567', 'maria.restrepo@example.com',
+ 'Calle 10 #20-30, Medellín', 'activo', 5000000.00, 'María'),
+('Supermercado Los Andes', 'NIT', '890123456-7', '2484567890', 'compras@losandes.co',
+ 'Autopista Norte, Salida Rionegro', 'activo', 20000000.00, 'Jefe de Compras');
+
+
+-- Venta de ejemplo (requiere que exista stock)
+INSERT INTO ventas 
+(id_cliente, id_cultivo, cantidad_vendida, precio_unitario, fecha_venta, 
+ estado_pago, metodo_pago, fecha_pago, numero_comprobante, id_usuario_registro)
+VALUES 
+(1, 1, 20.00, 3500.00, '2026-10-16', 'pagado', 'efectivo', '2026-10-16', 
+ 'FAC-001-2026', 2);
+
+
+-- Registramos el movimiento de venta (v4)
+INSERT INTO inventario_movimientos
+(id_cultivo, tipo_movimiento, cantidad_cambio, referencia_id, referencia_tipo,
+ observaciones, id_usuario, fecha_movimiento)
+VALUES
+(1, 'venta', -20.00, 1, 'venta', 'Venta a María Restrepo - Tomate Chonto', 
+ 2, '2026-10-16 14:00:00');
+
+
+-- =====================================================================
+-- VERIFICACIÓN RÁPIDA (descomenta para probar)
+-- =====================================================================
+-- SELECT * FROM usuarios;
+-- SELECT * FROM cultivos;
+-- SELECT * FROM inventario;
+-- SELECT * FROM v_inventario_actual;
+-- SELECT * FROM clientes;
+-- SELECT * FROM ventas;
+-- SELECT * FROM v_clientes_con_deuda;
+-- SELECT * FROM inventario_movimientos;
+-- SELECT * FROM v_inventario_historial;
+
+
+-- =====================================================================
+-- NOTAS IMPORTANTES PARA EL BACKEND (C#)
+-- =====================================================================
+-- 
+-- 1. TRIGGERS ELIMINADOS:
+--    Los triggers (trg_cosecha_after_insert, trg_venta_before_insert, 
+--    trg_venta_after_insert) que estaban en la v3 se han eliminado porque 
+--    la lógica de negocio vive en los servicios de C# (CosechaService, VentaService).
+--    Implementar en backend:
+--      - Al crear cosecha: INSERT inventario / UPDATE inventario
+--      - Al crear venta: validar stock, INSERT venta, UPDATE inventario
+--
+-- 2. AUDITORIA:
+--    Crear middleware o aspect para registrar cada INSERT/UPDATE/DELETE
+--    importante (cultivos, ventas, inventario_movimientos).
+--
+-- 3. INVENTARIO_MOVIMIENTOS:
+--    Obligatorio registrar aquí CADA cambio de stock para trazabilidad.
+--
+-- 4. VISTAS:
+--    Úsalas en los dashboards y reportes. Incluye condiciones WHERE apropiadas
+--    en las consultas para no traer datos "sucios" (borrados, cancelados).
+--
+-- 5. ÍNDICES:
+--    Mejoran rendimiento en reportes. Si agregas más filtros, considera
+--    índices compuestos adicionales.
+--
+-- =====================================================================
