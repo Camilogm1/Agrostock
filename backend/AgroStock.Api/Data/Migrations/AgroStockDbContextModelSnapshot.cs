@@ -80,6 +80,9 @@ namespace AgroStock.Api.Data.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("IdCultivo"));
 
+                    b.Property<bool>("Activo")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<DateTime>("FechaSiembra")
                         .HasColumnType("datetime(6)");
 

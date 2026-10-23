@@ -30,7 +30,7 @@ Proyecto de Ingeniería de Software, UPB Medellín, 2026.
 | Módulo | Qué permite | Requisitos |
 |---|---|---|
 | Autenticación | Inicio de sesión con usuario y contraseña; token JWT con rol | RNF-01, RNF-02 |
-| Cultivos | Registrar, listar, editar y eliminar cultivos (no se pueden eliminar si tienen cosechas) | RF-01 a RF-04 |
+| Cultivos | Registrar, listar, editar y eliminar cultivos. Los que tienen cosechas no se eliminan: se archivan para conservar su historial | RF-01 a RF-04 |
 | Cosechas | Registrar cosechas de un cultivo; el inventario sube automáticamente; historial por cultivo | RF-05 a RF-07, RF-10, RF-11 |
 | Inventario | Consultar el stock disponible por producto, con filtro por nombre o tipo de cultivo | RF-08, RF-09 |
 | Clientes | Registrar y buscar clientes; la identificación no se puede repetir | RF-12, RF-13, RNF-09 |
@@ -138,10 +138,12 @@ Todas las rutas, excepto el login y el health check, requieren el encabezado `Au
 |---|---|---|---|
 | GET | `/api/health` | Verifica que la API está encendida | Público |
 | POST | `/api/auth/login` | Inicia sesión y devuelve el token | Público |
-| GET | `/api/cultivos` | Lista los cultivos | Todos |
+| GET | `/api/cultivos?incluirArchivados=` | Lista los cultivos activos (o también los archivados) | Todos |
 | POST | `/api/cultivos` | Registra un cultivo (y su inventario en 0) | Administrador |
 | PUT | `/api/cultivos/{id}` | Modifica un cultivo | Administrador |
 | DELETE | `/api/cultivos/{id}` | Elimina un cultivo sin cosechas | Administrador |
+| POST | `/api/cultivos/{id}/archivar` | Archiva un cultivo con stock en 0 (lo oculta y conserva su historial) | Administrador |
+| POST | `/api/cultivos/{id}/restaurar` | Vuelve a activar un cultivo archivado | Administrador |
 | GET | `/api/cultivos/{id}/cosechas` | Historial de cosechas del cultivo | Todos |
 | POST | `/api/cosechas` | Registra una cosecha y suma al inventario | Administrador |
 | GET | `/api/inventario?filtro=` | Stock disponible, filtrado por nombre o tipo | Todos |
@@ -157,7 +159,7 @@ Los errores de negocio responden con `{ "mensaje": "..." }` y estos códigos:
 | 400 | Datos obligatorios vacíos o inválidos (RNF-06) |
 | 401 / 403 | Sin sesión / rol sin permiso |
 | 404 | El cultivo, cliente o inventario no existe (RF-10) |
-| 409 | Cultivo con cosechas (RF-04), identificación repetida (RNF-09) o venta simultánea sobre el mismo stock |
+| 409 | Cultivo con cosechas (RF-04), archivar con stock disponible, cosechar un cultivo archivado, identificación repetida (RNF-09) o venta simultánea sobre el mismo stock |
 | 422 | Stock insuficiente para la venta (RF-18) |
 
 ## Reglas de negocio
@@ -165,6 +167,7 @@ Los errores de negocio responden con `{ "mensaje": "..." }` y estos códigos:
 - **Inventario inicial:** al registrar un cultivo se crea su inventario con cantidad 0 (relación 1 a 1).
 - **Cosechas:** la cantidad debe ser mayor a 0 y el cultivo debe existir. La cosecha y el aumento de stock se guardan en la misma transacción.
 - **Eliminación de cultivos:** no se permite si tiene cosechas. Si no tiene, se elimina junto con su inventario (que está en 0).
+- **Archivar cultivos:** un cultivo con cosechas (por ejemplo, uno ya cosechado y vendido) se puede **archivar** cuando su stock está en 0. Deja de aparecer en cultivos, cosechas, inventario y el selector de ventas, pero sus cosechas y ventas se conservan en el historial (RF-11, RF-19). No admite cosechas nuevas hasta que se restaure. En la pantalla de Cultivos, "Mostrar archivados" los lista y permite restaurarlos.
 - **Ventas:** se valida que haya stock suficiente; la venta, su detalle y el descuento de stock se guardan en una sola transacción. El stock tiene control de concurrencia optimista, así que dos ventas simultáneas no pueden vender el mismo producto dos veces: una de ellas recibe un 409 y debe reintentarse.
 - **Clientes:** el número de identificación es único (validado en el servicio y con un índice único en la base).
 
@@ -175,7 +178,7 @@ cd backend
 dotnet test
 ```
 
-Hay 20 pruebas unitarias con base de datos en memoria (no necesitan MariaDB):
+Hay 24 pruebas unitarias con base de datos en memoria (no necesitan MariaDB):
 
 | Clase | Cubre |
 |---|---|
@@ -183,6 +186,7 @@ Hay 20 pruebas unitarias con base de datos en memoria (no necesitan MariaDB):
 | `CosechaServiceTests` | Aumento de inventario, cantidad no positiva, cultivo inexistente |
 | `ClienteServiceTests` | Identificación repetida, campos obligatorios, búsqueda |
 | `VentaServiceTests` | Descuento de stock, stock insuficiente sin efectos, cliente inexistente, filtros del historial |
+| `ArchivarCultivoTests` | Cultivo vendido: no se elimina pero se archiva conservando historial; stock disponible impide archivar; archivado no admite cosechas; restaurar |
 
 El pipeline `.github/workflows/ci.yml` corre en cada push y pull request: compila la solución, ejecuta las pruebas y compila el frontend.
 
@@ -214,7 +218,7 @@ El pipeline `.github/workflows/ci.yml` corre en cada push y pull request: compil
 | | HU-19 Descuento automático | ✅ Transaccional, con pruebas |
 | | HU-20 Historial con filtros | ✅ Por cliente y por fecha |
 | 4 · Calidad y cierre | HU-21 Flujo completo sin errores | ⚠️ Verificado manualmente contra MariaDB; falta el dataset de demo |
-| | HU-22 Pruebas funcionales y regresión | ⚠️ 20 pruebas unitarias; falta plan de pruebas por HU y evidencias |
+| | HU-22 Pruebas funcionales y regresión | ⚠️ 24 pruebas unitarias; falta plan de pruebas por HU y evidencias |
 | | HU-23 Usabilidad | ❌ Estados de carga/vacío, estilos, accesibilidad |
 | | HU-24 Documentación | ⚠️ README listo; falta manual de usuario por rol y diccionario de datos |
 | | HU-25 Demo | ❌ Guion, dataset estable y plan de contingencia |

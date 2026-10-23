@@ -17,6 +17,9 @@ namespace AgroStock.Api.Models
 
         public DateTime FechaSiembra { get; set; }
 
+        // Archivado = oculto de las listas, pero conserva su historial de cosechas y ventas
+        public bool Activo { get; set; } = true;
+
         // Agregación: 0..N cosechas, sin borrado en cascada (RF-04)
         public ICollection<Cosecha> Cosechas { get; set; } = new List<Cosecha>();
     }

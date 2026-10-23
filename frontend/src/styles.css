@@ -651,6 +651,36 @@ input:focus {
   font-size: 10px;
 }
 
+.crops-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.toggle-archived {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #657764;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.row-archived td {
+  opacity: 0.6;
+}
+
+.archived-badge {
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  color: #7a6a4f;
+  background: #f4efe3;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
 .row-actions {
   display: flex;
   gap: 14px;
