@@ -23,14 +23,11 @@ namespace AgroStock.Api.Tests
         }
 
         [Fact]
-        public async Task CultivoVendido_NoSePuedeEliminarPeroSiArchivar_YConservaElHistorial()
+        public async Task CultivoVendido_SeArchivaYConservaElHistorial()
         {
             await using var db = TestDb.Crear();
             var (idCultivo, _) = await CultivoVendidoAsync(db);
             var service = new CultivoService(db);
-
-            var ex = await Assert.ThrowsAsync<CultivoConCosechasException>(() => service.EliminarAsync(idCultivo)); // RF-04
-            Assert.Contains("Archívelo", ex.Message);
 
             var archivado = await service.ArchivarAsync(idCultivo);
 
@@ -50,8 +47,25 @@ namespace AgroStock.Api.Tests
                 new CultivoRequest("Papa", "Tubérculo", "B1", new DateTime(2026, 1, 1)));
             await new CosechaService(db).RegistrarCosechaAsync(new CosechaRequest(cultivo.IdCultivo, 30, new DateTime(2026, 4, 1)));
 
-            await Assert.ThrowsAsync<ConflictoException>(() => new CultivoService(db).ArchivarAsync(cultivo.IdCultivo));
+            await Assert.ThrowsAsync<CultivoConStockException>(() => new CultivoService(db).ArchivarAsync(cultivo.IdCultivo));
             Assert.True((await db.Cultivos.FindAsync(cultivo.IdCultivo))!.Activo);
+        }
+
+        [Fact]
+        public async Task CultivoVendido_SeEliminaConSusCosechas_YLasVentasConservanElProducto()
+        {
+            await using var db = TestDb.Crear();
+            var (idCultivo, idInventario) = await CultivoVendidoAsync(db);
+
+            await new CultivoService(db).EliminarAsync(idCultivo);
+
+            Assert.Empty(db.Cultivos);
+            Assert.Empty(db.Cosechas);
+            Assert.Empty(db.Inventarios);
+            var venta = Assert.Single(await new VentaService(db).ListarAsync(null, null)); // RF-19
+            var detalle = Assert.Single(venta.Detalles);
+            Assert.Equal("Tomate", detalle.NombreProducto);
+            Assert.Null(detalle.IdInventario);
         }
 
         [Fact]

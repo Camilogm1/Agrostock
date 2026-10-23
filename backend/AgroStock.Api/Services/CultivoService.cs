@@ -62,20 +62,26 @@ namespace AgroStock.Api.Services
                 .FirstOrDefaultAsync(c => c.IdCultivo == idCultivo)
                 ?? throw new NotFoundException($"Cultivo {idCultivo} no encontrado.");
 
-            if (cultivo.Cosechas.Any())
-                throw new CultivoConCosechasException(idCultivo); // RF-04
-
-            // Sin cosechas el inventario está en 0 y no tiene ventas, así que se elimina con el cultivo.
+            // RF-04 (ajustado): solo se elimina si ya no le queda stock. Se borran sus cosechas e
+            // inventario; las ventas se conservan en el historial con el nombre del producto (RF-19).
             var inventario = await _db.Inventarios.FirstOrDefaultAsync(i => i.IdCultivo == idCultivo);
             if (inventario is not null)
-                _db.Inventarios.Remove(inventario);
+            {
+                if (inventario.CantidadDisponible > 0)
+                    throw new CultivoConStockException(idCultivo, inventario.CantidadDisponible);
 
+                var detalles = await _db.DetallesVenta.Where(d => d.IdInventario == inventario.IdInventario).ToListAsync();
+                detalles.ForEach(d => d.IdInventario = null);
+                _db.Inventarios.Remove(inventario);
+            }
+
+            _db.Cosechas.RemoveRange(cultivo.Cosechas);
             _db.Cultivos.Remove(cultivo);
             await _db.SaveChangesAsync();
         }
 
-        // Para cultivos con historial, que no se pueden eliminar (RF-04): deja de aparecer en
-        // las listas, pero sus cosechas y ventas se conservan (RF-11, RF-19).
+        // Alternativa a eliminar: deja de aparecer en las listas, pero conserva sus cosechas
+        // (RF-11) y ventas (RF-19) y se puede restaurar.
         public async Task<CultivoResponse> ArchivarAsync(int idCultivo)
         {
             var cultivo = await _db.Cultivos.FindAsync(idCultivo)
@@ -86,8 +92,7 @@ namespace AgroStock.Api.Services
                 .Select(i => i.CantidadDisponible)
                 .FirstOrDefaultAsync();
             if (stock > 0)
-                throw new ConflictoException(
-                    $"No se puede archivar el cultivo {idCultivo}: aún tiene {stock} unidades disponibles en inventario.");
+                throw new CultivoConStockException(idCultivo, stock);
 
             cultivo.Activo = false;
             await _db.SaveChangesAsync();

@@ -62,7 +62,7 @@ export default function Cultivos() {
   }
 
   async function handleEliminar(cultivo) {
-    if (!window.confirm(`¿Eliminar el cultivo "${cultivo.nombre}"?`)) return;
+    if (!window.confirm(`¿Eliminar el cultivo "${cultivo.nombre}"? También se borrarán sus cosechas. Sus ventas se conservan en el historial.`)) return;
     setError("");
     setMensaje("");
     try {
