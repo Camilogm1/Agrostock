@@ -12,21 +12,26 @@ export default function Cultivos() {
   const [form, setForm] = useState(FORM_VACIO);
   const [editandoId, setEditandoId] = useState(null);
   const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [verArchivados, setVerArchivados] = useState(false);
 
   async function cargar() {
     try {
-      const { data } = await axiosClient.get("/cultivos");
+      const { data } = await axiosClient.get("/cultivos", { params: { incluirArchivados: verArchivados } });
       setCultivos(data);
     } catch (err) {
       setError(err.message);
     }
   }
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [verArchivados]);
+
+  const activos = cultivos.filter((c) => c.activo).length;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setMensaje("");
     try {
       if (editandoId) {
         await axiosClient.put(`/cultivos/${editandoId}`, form); // RF-03
@@ -59,8 +64,36 @@ export default function Cultivos() {
   async function handleEliminar(cultivo) {
     if (!window.confirm(`¿Eliminar el cultivo "${cultivo.nombre}"?`)) return;
     setError("");
+    setMensaje("");
     try {
       await axiosClient.delete(`/cultivos/${cultivo.idCultivo}`); // RF-04
+      setMensaje(`Cultivo "${cultivo.nombre}" eliminado.`);
+      cargar();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  // Para cultivos con cosechas o ventas: se ocultan sin borrar su historial
+  async function handleArchivar(cultivo) {
+    if (!window.confirm(`¿Archivar el cultivo "${cultivo.nombre}"? Dejará de aparecer en las listas, pero se conservan sus cosechas y ventas.`)) return;
+    setError("");
+    setMensaje("");
+    try {
+      await axiosClient.post(`/cultivos/${cultivo.idCultivo}/archivar`);
+      setMensaje(`Cultivo "${cultivo.nombre}" archivado. Puedes verlo con "Mostrar archivados".`);
+      cargar();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRestaurar(cultivo) {
+    setError("");
+    setMensaje("");
+    try {
+      await axiosClient.post(`/cultivos/${cultivo.idCultivo}/restaurar`);
+      setMensaje(`Cultivo "${cultivo.nombre}" restaurado.`);
       cargar();
     } catch (err) {
       setError(err.message);
@@ -90,7 +123,7 @@ export default function Cultivos() {
         </div>
         <div className="summary-copy">
           <span>Cultivos registrados</span>
-          <strong>{cultivos.length}</strong>
+          <strong>{activos}</strong>
         </div>
         <span className="summary-caption">En todos tus lotes</span>
       </section>
@@ -139,6 +172,7 @@ export default function Cultivos() {
         </section>
       )}
 
+      {mensaje && <p className="alert alert-success" role="status">{mensaje}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
 
       <section className="panel crops-panel">
@@ -147,7 +181,13 @@ export default function Cultivos() {
             <h2>Todos los cultivos</h2>
             <p>Revisa la información de tus siembras y lotes.</p>
           </div>
-          <span className="table-count">{cultivos.length} {cultivos.length === 1 ? "cultivo" : "cultivos"}</span>
+          <div className="crops-heading-actions">
+            <label className="toggle-archived">
+              <input type="checkbox" checked={verArchivados} onChange={(e) => setVerArchivados(e.target.checked)} />
+              Mostrar archivados
+            </label>
+            <span className="table-count">{cultivos.length} {cultivos.length === 1 ? "cultivo" : "cultivos"}</span>
+          </div>
         </div>
         <div className="table-scroll">
           <table className="data-table">
@@ -162,18 +202,28 @@ export default function Cultivos() {
             </thead>
             <tbody>
               {cultivos.map((c) => (
-                <tr key={c.idCultivo}>
-                  <td className="crop-name">{c.nombre}</td>
+                <tr key={c.idCultivo} className={c.activo ? undefined : "row-archived"}>
+                  <td className="crop-name">
+                    {c.nombre}
+                    {!c.activo && <span className="archived-badge">Archivado</span>}
+                  </td>
                   <td><span className="crop-type">{c.tipo}</span></td>
                   <td>{c.lote}</td>
                   <td>{formatearFecha(c.fechaSiembra)}</td>
                   {esAdmin && (
                     <td>
                       <div className="row-actions">
-                        <button className="text-button" onClick={() => handleEditar(c)}>Editar</button>
-                        <button className="text-button text-button-danger" onClick={() => handleEliminar(c)}>
-                          Eliminar
-                        </button>
+                        {c.activo ? (
+                          <>
+                            <button className="text-button" onClick={() => handleEditar(c)}>Editar</button>
+                            <button className="text-button" onClick={() => handleArchivar(c)}>Archivar</button>
+                            <button className="text-button text-button-danger" onClick={() => handleEliminar(c)}>
+                              Eliminar
+                            </button>
+                          </>
+                        ) : (
+                          <button className="text-button" onClick={() => handleRestaurar(c)}>Restaurar</button>
+                        )}
                       </div>
                     </td>
                   )}

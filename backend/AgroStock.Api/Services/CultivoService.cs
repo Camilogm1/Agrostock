@@ -30,11 +30,12 @@ namespace AgroStock.Api.Services
             return ToResponse(cultivo);
         }
 
-        public async Task<List<CultivoResponse>> ListarAsync()
+        public async Task<List<CultivoResponse>> ListarAsync(bool incluirArchivados = false)
         {
             return await _db.Cultivos
+                .Where(c => incluirArchivados || c.Activo)
                 .OrderBy(c => c.Nombre)
-                .Select(c => new CultivoResponse(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra))
+                .Select(c => new CultivoResponse(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra, c.Activo))
                 .ToListAsync();
         }
 
@@ -73,6 +74,36 @@ namespace AgroStock.Api.Services
             await _db.SaveChangesAsync();
         }
 
+        // Para cultivos con historial, que no se pueden eliminar (RF-04): deja de aparecer en
+        // las listas, pero sus cosechas y ventas se conservan (RF-11, RF-19).
+        public async Task<CultivoResponse> ArchivarAsync(int idCultivo)
+        {
+            var cultivo = await _db.Cultivos.FindAsync(idCultivo)
+                ?? throw new NotFoundException($"Cultivo {idCultivo} no encontrado.");
+
+            var stock = await _db.Inventarios
+                .Where(i => i.IdCultivo == idCultivo)
+                .Select(i => i.CantidadDisponible)
+                .FirstOrDefaultAsync();
+            if (stock > 0)
+                throw new ConflictoException(
+                    $"No se puede archivar el cultivo {idCultivo}: aún tiene {stock} unidades disponibles en inventario.");
+
+            cultivo.Activo = false;
+            await _db.SaveChangesAsync();
+            return ToResponse(cultivo);
+        }
+
+        public async Task<CultivoResponse> RestaurarAsync(int idCultivo)
+        {
+            var cultivo = await _db.Cultivos.FindAsync(idCultivo)
+                ?? throw new NotFoundException($"Cultivo {idCultivo} no encontrado.");
+
+            cultivo.Activo = true;
+            await _db.SaveChangesAsync();
+            return ToResponse(cultivo);
+        }
+
         public async Task<List<CosechaResponse>> ListarCosechasAsync(int idCultivo)
         {
             var existe = await _db.Cultivos.AnyAsync(c => c.IdCultivo == idCultivo);
@@ -99,6 +130,6 @@ namespace AgroStock.Api.Services
         }
 
         private static CultivoResponse ToResponse(Cultivo c) =>
-            new(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra);
+            new(c.IdCultivo, c.Nombre, c.Tipo, c.Lote, c.FechaSiembra, c.Activo);
     }
 }

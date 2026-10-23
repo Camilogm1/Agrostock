@@ -11,7 +11,7 @@ namespace AgroStock.Api.Services
 
         public async Task<List<InventarioResponse>> ListarAsync(string? filtro)
         {
-            var query = _db.Inventarios.AsQueryable();
+            var query = _db.Inventarios.Where(i => i.Cultivo!.Activo);
 
             if (!string.IsNullOrWhiteSpace(filtro))
                 query = query.Where(i => i.Cultivo!.Nombre.Contains(filtro) || i.Cultivo!.Tipo.Contains(filtro));

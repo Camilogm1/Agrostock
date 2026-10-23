@@ -20,6 +20,8 @@ namespace AgroStock.Api.Services
 
             var cultivo = await _db.Cultivos.FindAsync(request.IdCultivo)
                 ?? throw new NotFoundException($"Cultivo {request.IdCultivo} no encontrado."); // RF-10
+            if (!cultivo.Activo)
+                throw new ConflictoException($"El cultivo {cultivo.IdCultivo} está archivado. Restáurelo para registrar cosechas.");
 
             var cosecha = new Cosecha
             {
