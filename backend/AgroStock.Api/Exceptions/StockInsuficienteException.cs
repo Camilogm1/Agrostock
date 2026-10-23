@@ -7,7 +7,7 @@ namespace AgroStock.Api.Exceptions
         public decimal CantidadDisponible { get; }
 
         public StockInsuficienteException(int idInventario, decimal solicitada, decimal disponible)
-            : base($"Stock insuficiente para el inventario {idInventario}: solicitado {solicitada}, disponible {disponible}.")
+            : base($"Stock insuficiente: solicitó {solicitada:0.##} kg y solo hay {disponible:0.##} kg disponibles.")
         {
             IdInventario = idInventario;
             CantidadSolicitada = solicitada;

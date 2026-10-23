@@ -116,12 +116,12 @@ export default function Cosechas() {
             </select>
           </label>
           <label className="field">
-            <span>Cantidad cosechada</span>
+            <span>Cantidad cosechada (kg)</span>
             <input
               type="number"
               step="0.01"
               min="0.01"
-              placeholder="Ej. 25"
+              placeholder="Ej. 25 kg"
               value={form.cantidad}
               onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
               required
@@ -148,12 +148,12 @@ export default function Cosechas() {
         <div className="table-scroll">
           <table className="data-table">
             <thead>
-              <tr><th>Cantidad</th><th>Fecha</th></tr>
+              <tr><th>Cantidad (kg)</th><th>Fecha</th></tr>
             </thead>
             <tbody>
               {historial.map((registro) => (
                 <tr key={registro.idCosecha}>
-                  <td><span className="stock-quantity">{registro.cantidad}</span></td>
+                  <td><span className="stock-quantity">{registro.cantidad} kg</span></td>
                   <td>{formatearFecha(registro.fecha)}</td>
                 </tr>
               ))}
