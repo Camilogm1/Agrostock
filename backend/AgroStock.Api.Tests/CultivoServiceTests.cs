@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using AgroStock.Api.DTOs;
 using AgroStock.Api.Exceptions;
-using AgroStock.Api.Models;
 using AgroStock.Api.Services;
 using Xunit;
 
@@ -87,16 +86,16 @@ namespace AgroStock.Api.Tests
         }
 
         [Fact]
-        public async Task EliminarAsync_CultivoConCosechas_LanzaExcepcion()
+        public async Task EliminarAsync_CultivoConStockDisponible_LanzaExcepcion()
         {
             await using var db = TestDb.Crear();
             var service = new CultivoService(db);
             var cultivo = await service.RegistrarAsync(new CultivoRequest("Café", "Permanente", "C1", new DateTime(2026, 1, 1)));
+            await new CosechaService(db).RegistrarCosechaAsync(new CosechaRequest(cultivo.IdCultivo, 10, new DateTime(2026, 4, 1)));
 
-            db.Cosechas.Add(new Cosecha { IdCultivo = cultivo.IdCultivo, Cantidad = 10, Fecha = DateTime.Today });
-            await db.SaveChangesAsync();
-
-            await Assert.ThrowsAsync<CultivoConCosechasException>(() => service.EliminarAsync(cultivo.IdCultivo)); // RF-04
+            await Assert.ThrowsAsync<CultivoConStockException>(() => service.EliminarAsync(cultivo.IdCultivo)); // RF-04
+            Assert.Single(db.Cultivos);
+            Assert.Single(db.Cosechas);
         }
 
         [Fact]

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../api/axiosClient";
 
+// Mismas reglas que valida el backend (ClienteService)
+const CARACTERES_NO_PERMITIDOS_NOMBRE = /[^\p{L} .'-]/gu;
+const NO_DIGITOS = /[^0-9]/g;
+
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [form, setForm] = useState({ nombre: "", numeroIdentificacion: "" });
@@ -79,16 +83,25 @@ export default function Clientes() {
             <input
               placeholder="Ej. María Pérez"
               value={form.nombre}
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value.replace(CARACTERES_NO_PERMITIDOS_NOMBRE, "") })}
+              minLength={3}
+              maxLength={150}
+              pattern="\p{L}[\p{L} .'\-]*"
+              title="Solo letras y espacios, mínimo 3 caracteres."
               required
             />
           </label>
           <label className="field">
             <span>Número de identificación</span>
             <input
-              placeholder="Ingresa la identificación"
+              placeholder="Solo números, sin puntos ni guiones"
+              inputMode="numeric"
               value={form.numeroIdentificacion}
-              onChange={(e) => setForm({ ...form, numeroIdentificacion: e.target.value })}
+              onChange={(e) => setForm({ ...form, numeroIdentificacion: e.target.value.replace(NO_DIGITOS, "") })}
+              minLength={6}
+              maxLength={15}
+              pattern="[0-9]{6,15}"
+              title="Entre 6 y 15 dígitos, solo números."
               required
             />
           </label>

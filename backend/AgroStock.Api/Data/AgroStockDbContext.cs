@@ -83,10 +83,11 @@ namespace AgroStock.Api.Data
             {
                 e.HasKey(d => d.IdDetalleVenta);
                 e.Property(d => d.Cantidad).HasColumnType("decimal(18,2)");
+                e.Property(d => d.NombreProducto).IsRequired().HasMaxLength(100);
                 e.HasOne(d => d.Inventario)
                  .WithMany()
                  .HasForeignKey(d => d.IdInventario)
-                 .OnDelete(DeleteBehavior.Restrict);
+                 .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

@@ -54,8 +54,8 @@ export default function Inventario() {
         <div className="summary-card">
           <div className="summary-icon summary-icon-earth" aria-hidden="true">#</div>
           <div className="summary-copy">
-            <span>Unidades disponibles</span>
-            <strong>{cantidadTotal.toLocaleString()}</strong>
+            <span>Kilos disponibles</span>
+            <strong>{cantidadTotal.toLocaleString()} kg</strong>
           </div>
         </div>
       </section>
@@ -87,7 +87,7 @@ export default function Inventario() {
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Cantidad disponible</th>
+                <th>Cantidad disponible (kg)</th>
                 <th>Última actualización</th>
               </tr>
             </thead>
@@ -95,7 +95,7 @@ export default function Inventario() {
               {items.map((item) => (
                 <tr key={item.idInventario}>
                   <td className="crop-name">{item.nombreProducto}</td>
-                  <td><span className="stock-quantity">{item.cantidadDisponible}</span></td>
+                  <td><span className="stock-quantity">{item.cantidadDisponible} kg</span></td>
                   <td>{new Date(item.fechaActualizacion).toLocaleString()}</td>
                 </tr>
               ))}

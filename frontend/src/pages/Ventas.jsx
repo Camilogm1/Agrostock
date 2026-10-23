@@ -129,18 +129,18 @@ export default function Ventas() {
               <option value="">Selecciona un producto</option>
               {inventario.map((item) => (
                 <option key={item.idInventario} value={item.idInventario} disabled={item.cantidadDisponible <= 0}>
-                  {item.nombreProducto} (disponible: {item.cantidadDisponible})
+                  {item.nombreProducto} (disponible: {item.cantidadDisponible} kg)
                 </option>
               ))}
             </select>
           </label>
           <label className="field">
-            <span>Cantidad</span>
+            <span>Cantidad (kg)</span>
             <input
               type="number"
               step="0.01"
               min="0.01"
-              placeholder="Ej. 5"
+              placeholder="Ej. 5 kg"
               value={form.cantidad}
               onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
               required
@@ -183,7 +183,7 @@ export default function Ventas() {
         <div className="table-scroll">
           <table className="data-table">
             <thead>
-              <tr><th>Cliente</th><th>Fecha</th><th>Producto</th><th>Cantidad</th></tr>
+              <tr><th>Cliente</th><th>Fecha</th><th>Producto</th><th>Cantidad (kg)</th></tr>
             </thead>
             <tbody>
               {ventas.flatMap((venta) => venta.detalles.map((detalle, index) => (
@@ -191,7 +191,7 @@ export default function Ventas() {
                   <td className="crop-name">{venta.nombreCliente}</td>
                   <td>{formatearFecha(venta.fecha)}</td>
                   <td>{detalle.nombreProducto}</td>
-                  <td><span className="stock-quantity">{detalle.cantidad}</span></td>
+                  <td><span className="stock-quantity">{detalle.cantidad} kg</span></td>
                 </tr>
               )))}
               {lineasVendidas === 0 && (

@@ -117,11 +117,16 @@ namespace AgroStock.Api.Data.Migrations
                     b.Property<decimal>("Cantidad")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("IdInventario")
+                    b.Property<int?>("IdInventario")
                         .HasColumnType("int");
 
                     b.Property<int>("IdVenta")
                         .HasColumnType("int");
+
+                    b.Property<string>("NombreProducto")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
                     b.HasKey("IdDetalleVenta");
 
@@ -224,8 +229,7 @@ namespace AgroStock.Api.Data.Migrations
                     b.HasOne("AgroStock.Api.Models.Inventario", "Inventario")
                         .WithMany()
                         .HasForeignKey("IdInventario")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("AgroStock.Api.Models.Venta", "Venta")
                         .WithMany("Detalles")

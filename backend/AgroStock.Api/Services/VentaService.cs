@@ -31,7 +31,12 @@ namespace AgroStock.Api.Services
             inventario.DescontarStock(request.Cantidad); // lanza StockInsuficienteException si no alcanza
 
             var venta = new Venta { IdCliente = cliente.IdCliente, Fecha = request.Fecha };
-            venta.Detalles.Add(new DetalleVenta { Inventario = inventario, Cantidad = request.Cantidad });
+            venta.Detalles.Add(new DetalleVenta
+            {
+                Inventario = inventario,
+                Cantidad = request.Cantidad,
+                NombreProducto = ObtenerNombreProducto(inventario)
+            });
             _db.Ventas.Add(venta);
 
             // Un solo SaveChanges = una transacción (venta + detalle + stock). Si otra venta cambió
@@ -47,7 +52,7 @@ namespace AgroStock.Api.Services
         {
             var query = _db.Ventas
                 .Include(v => v.Cliente)
-                .Include(v => v.Detalles).ThenInclude(d => d.Inventario).ThenInclude(i => i!.Cultivo)
+                .Include(v => v.Detalles)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(filtroCliente))
@@ -64,7 +69,7 @@ namespace AgroStock.Api.Services
             return ventas.Select(v => new VentaResponse(
                 v.IdVenta, v.Fecha, v.IdCliente, v.Cliente!.Nombre,
                 v.Detalles.Select(d => new DetalleVentaResponse(
-                    d.IdInventario, ObtenerNombreProducto(d.Inventario!), d.Cantidad)).ToList()
+                    d.IdInventario, d.NombreProducto, d.Cantidad)).ToList()
             )).ToList();
         }
 
